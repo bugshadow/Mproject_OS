@@ -10,7 +10,7 @@ Bienvenue sur le depot du projet blackbox. Ce README explique l'architecture du 
 L'architecture (realisee par Dev 1) est modulaire. Le point d'entree est le script "blackbox" a la racine. Le code defini pour chaque tache est decoupe dans le dossier "src/".
 ```text
 Mproject_OS/
-|-- blackbox                 # Point d'entree (Squelette + Getopts) - NE PAS MODIFIER !
+|-- blackbox                 # Point d'entree (Squelette + Getopts) 
 |-- src/                     # Code metier pour chaque mode
 |   |-- utils.sh             # Fonctions partagees : log_event(), die(), cleanup()
 |   |-- mode_watch.sh        # Code Dev 1 : Mode -w (Termine)
