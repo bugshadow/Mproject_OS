@@ -3,13 +3,14 @@ CFLAGS = -Wall -Wextra -pthread
 SRC_DIR = src
 BIN_DIR = bin
 
+# La règle par défaut DOIT être la première du fichier
+all: init clean create_dirs build success
+
 # Ajout d'une règle "init" pour configurer les permissions
 init:
 	@echo "Configuration des permissions en cours..."
 	@chmod +x blackbox tests/test_environment.sh
 	@echo "Permissions d'execution accordees avec succes !"
-
-all: init clean create_dirs build success
 
 success:
 	@printf "\n\033[1;32m[✓] Configuration terminee avec succes !\033[0m\n"
