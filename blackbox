@@ -1,0 +1,142 @@
+#!/bin/bash
+
+# ==============================================================================
+# BLACKBOX - Boîte Noire pour Serveurs Linux
+# ENSET Mohammedia — Module SE 2025/2026
+# Rôle : Dev 1 — Core Architecture Lead
+# ==============================================================================
+
+# ── Couleurs ANSI ──
+export LC_ALL=C
+export C_RESET="\e[0m"
+export C_GREEN="\e[32m"
+export C_RED="\e[31m"
+export C_YELLOW="\e[33m"
+export C_BLUE="\e[34m"
+export C_CYAN="\e[36m"
+export C_BRED="\e[1;31m"
+
+# ── Variables Globales ──
+export LOG_DIR="/var/log/blackbox"
+export SERVICE_NAME=""
+export MODE=""
+export PLAYBACK_DATE=""
+export FLAG_SUBSHELL=false
+export FLAG_FORK=false
+export FLAG_THREAD=false
+export FLAG_VERBOSE=false
+export CUSTOM_LOG_DIR=""
+
+# ── Inclusions Modulaires (Dossier src/) ──
+source ./src/utils.sh
+source ./src/mode_watch.sh
+source ./src/mode_analyze.sh
+source ./src/mode_playback.sh
+
+# ── Parse des options (Getopts complet - Fondation Dev 1) ──
+parse_options() {
+    while getopts ":hwap:sftl:rv" opt; do
+        case $opt in
+            h) display_help; exit 0 ;;
+            w) MODE="watch" ;;
+            a) MODE="analyze" ;;
+            p) MODE="playback"; PLAYBACK_DATE="$OPTARG" ;;
+            s) FLAG_SUBSHELL=true ;;
+            f) FLAG_FORK=true ;;
+            t) FLAG_THREAD=true ;;
+            v) FLAG_VERBOSE=true; export FLAG_VERBOSE ;;
+            l) CUSTOM_LOG_DIR="$OPTARG" ;;
+            r) MODE="restore" ;;
+            ?) die 100 "Option inconnue: -$OPTARG" ;;
+        esac
+    done
+    shift $((OPTIND - 1))
+    SERVICE_NAME="$1"
+    export SERVICE_NAME
+}
+
+# ── Initialisation ──
+init_environment() {
+    if [ -n "$CUSTOM_LOG_DIR" ]; then
+        LOG_DIR="$CUSTOM_LOG_DIR"
+        export LOG_DIR
+    fi
+    export LOG_FILE="$LOG_DIR/history.log"
+    export ARCHIVE_DIR="$LOG_DIR/archives"
+    
+    if [ "$MODE" != "restore" ]; then
+        mkdir -p "$LOG_DIR" "$ARCHIVE_DIR"
+        touch "$LOG_FILE"
+    fi
+    
+    [ -n "$MODE" ] && log_event "INFOS" "blackbox démarré — service: ${SERVICE_NAME:-N/A} — mode: $MODE"
+}
+
+# ── Validation ──
+validate() {
+    [ "$MODE" = "restore" ] && return
+    
+    [ -z "$SERVICE_NAME" ] && die 101 "Service name manquant"
+    
+    if [ "$MODE" = "analyze" ] || [ "$MODE" = "watch" ]; then
+        local log_path="/var/log/$SERVICE_NAME"
+        if [[ "$LOG_DIR" == *"./var/log"* || "$LOG_DIR" == *"var/log"* ]]; then
+            log_path="./tests/sample_logs"
+        fi
+        [ ! -d "$log_path" ] && [ ! -d "/var/log/$SERVICE_NAME" ] && die 102 "Dossier de logs introuvable pour $SERVICE_NAME"
+    fi
+
+    if [ "$MODE" = "playback" ]; then
+        [ ! -f "$LOG_FILE" ] && die 104 "Fichier history.log non trouvé pour rejeu"
+    fi
+}
+
+mode_restore() { 
+    [ "$(id -u)" != "0" ] && die 103 "Privilèges root requis pour -r"
+    rm -rf "$LOG_DIR"
+    log_event "INFOS" "Environnement réinitialisé avec succès"
+    exit 0
+}
+
+# ── Dispatcher (Exécution du bon mode) ──
+run_mode() {
+    case "$MODE" in
+        watch)    watch_main "$SERVICE_NAME" ;;
+        analyze)  analyze_main "$SERVICE_NAME" ;;
+        playback) playback_main "$SERVICE_NAME" "$PLAYBACK_DATE" ;;
+        restore)  mode_restore ;;
+        *) die 100 "Aucun mode principal spécifié (-w, -a, -p, -r)" ;;
+    esac
+}
+
+# ── Point d'Entrée Principal ──
+main() {
+    parse_options "$@"
+    
+    if [ -z "$MODE" ]; then
+        display_help
+        exit 0
+    fi
+
+    init_environment
+    validate
+
+    # TODO Dev 3: Intégration de compress_helper.c (Option Thread)
+    if $FLAG_THREAD; then
+        log_event "INFOS" "Option Thread activée. (En attente d'implémentation logique C par Dev 3)"
+    fi
+
+    if $FLAG_SUBSHELL; then
+        log_event "INFOS" "Mode isolé activé (Subshell)."
+        echo -e "${C_CYAN}PID parent: $$${C_RESET}"
+        (
+            export LOG_DIR FLAG_VERBOSE C_RESET C_CYAN C_RED C_GREEN C_YELLOW C_BRED LOG_FILE
+            echo -e "${C_CYAN}PID sous-shell: $BASHPID${C_RESET}"
+            run_mode
+        )
+    else
+        run_mode
+    fi
+}
+
+main "$@"

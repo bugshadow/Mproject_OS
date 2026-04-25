@@ -1,0 +1,15 @@
+# Binaires
+bin/
+compress_helper
+
+# Dossiers temporaires et logs locaux
+var/
+.DS_Store
+
+# Fichiers de test très volumineux
+tests/sample_logs/*.log
+tests/sample_logs/*.gz
+
+# Archives
+*.tar.gz
+*.zip
