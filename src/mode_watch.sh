@@ -1,247 +1,596 @@
 #!/bin/bash
-<<<<<<< HEAD
 
 # ==============================================================================
-# MODE WATCH : Surveillance Temps Réel (Rôle de Dev 1)
+# BLACKBOX — MODE ANALYZE : Analyse Forensique & Corrélation
+# ENSET Mohammedia — Module SE 2025/2026
+# Rôle : Dev 2 — Analysis & Forensics
 # ==============================================================================
 
-# Fonction d'interception appelée avant chaque affichage de prompt
-blackbox_log_cmd() {
-    local exit_code=$?
-    local cmd
-    cmd=$(history 1 | sed -e "s/^[ ]*[0-9]*[ ]*//")
-    
-    if [ -n "$cmd" ]; then
-        log_event "CMD" "${PWD} : ${cmd}"
-        log_event "RET" "${exit_code}"
-        
-        # Détection des commandes dangereuses (Regex Bash dans une variable pour éviter les erreurs de syntaxe)
-        local danger_pattern='rm -rf /|chmod 777 /etc|dd if=/dev/zero|mkfs|:\(\)\{.*\}|> /dev/sda'
-        if [[ "$cmd" =~ $danger_pattern ]]; then
-            log_event "DANGER" "Commande critique détectée : $cmd"
-            echo -e "${C_BRED}[⚠] ALERTE ROUGE : Exécution d'une commande destructrice détectée !${C_RESET}"
-        fi
+# ── Constantes ──
+readonly DANGER_THRESHOLD=5      # secondes max entre commande et erreur pour corréler
+readonly MAX_LINES_DISPLAY=10    # nb de lignes max à afficher dans le terminal
+readonly LOG_SIZE_FORK=104857600 # 100MB en bytes → seuil pour activer le fork
 
-        # Snapshot Système
-        local cpu ram disk
-        cpu=$(ps aux --sort=-%cpu 2>/dev/null | head -2 | tail -1 | awk '{print $3}')
-        ram=$(free -h 2>/dev/null | awk '/Mem/ {print $7}')
-        disk=$(df -h / 2>/dev/null | tail -1 | awk '{print $5}')
-        
-        log_event "SNAP" "CPU=${cpu:-N/A}% | RAM_Avail=${ram:-N/A} | Disk_Root=${disk:-N/A}"
-        
-        if [ "$FLAG_VERBOSE" = true ]; then
-            echo -e "┌───────────────────┬──────────────┬────────────┐"
-            echo -e "│ Métrique          │ Valeur       │ Statut     │"
-            echo -e "├───────────────────┼──────────────┼────────────┤"
-            echo -e "│ CPU Usage         │ ${cpu:-N/A}%         │ -          │"
-            echo -e "│ RAM Available     │ ${ram:-N/A}       │ -          │"
-            echo -e "│ Disk /            │ ${disk:-N/A}        │ -          │"
-            echo -e "└───────────────────┴──────────────┴────────────┘"
-        fi
-    fi
-}
-# L'export est crucial pour que le PROMPT_COMMAND puisse l'appeler dans les processus enfants
-export -f blackbox_log_cmd
-
-# Point d'entrée interne pour le Watch Mode
-watch_main() {
+# ==============================================================================
+# FONCTION PRINCIPALE — appelée par blackbox main
+# ==============================================================================
+analyze_main() {
     local service="$1"
-    
-    log_event "INFOS" "Surveillance active sur les commandes utilisateur pour le service $service"
-    export PROMPT_COMMAND="blackbox_log_cmd; $PROMPT_COMMAND"
-    
-    if [ "$FLAG_SUBSHELL" = false ]; then
-        # On remplace le processus actuel par un terminal Bash interactif (mais surveillé)
-        exec bash
+
+    echo -e "\n${C_CYAN}╔══════════════════════════════════════════════════════╗${C_RESET}"
+    echo -e "${C_CYAN}║       BLACKBOX — Analyse Forensique : ${service}        ${C_RESET}"
+    echo -e "${C_CYAN}╚══════════════════════════════════════════════════════╝${C_RESET}\n"
+
+    log_event "INFOS" "Démarrage de l'analyse forensique pour le service: $service"
+
+    # ── Déterminer le chemin des logs du service ──
+    local log_path
+    log_path=$(_resolve_log_path "$service")
+
+    if [ -z "$log_path" ]; then
+        log_event "ERROR" "Impossible de trouver les logs pour: $service"
+        die 102 "Dossier de logs introuvable pour $service"
     fi
-}
-=======
-# ==============================================================================
-# mode_watch.sh — Module Watch (Dev 1)
-# Boîte noire légère pour serveurs Linux — blackbox
-# ==============================================================================
-# Ce module est sourcé par le script principal blackbox.
-# Il définit la fonction watch_main(), appelée lors de l'option -w.
-# ==============================================================================
 
-# ------------------------------------------------------------
-# Fonction utilitaire : capture d'un snapshot système
-# ------------------------------------------------------------
-__blackbox_snapshot() {
-    local loadavg cpu_mem disk topproc
-    loadavg=$(uptime 2>/dev/null | awk -F'load average: ' '{print $2}' | tr -d ' ')
-    cpu_mem=$(free -m 2>/dev/null | awk '/^Mem:/{printf "%s/%s", $3, $2}')
-    disk=$(df -h / 2>/dev/null | awk 'NR==2{print $5}')
-    topproc=$(ps aux --sort=-%cpu 2>/dev/null | awk 'NR>1{print $11}' | head -5 | tr '\n' ',' | sed 's/,$//')
-    echo "CPU=${loadavg:-N/A} MEM=${cpu_mem:-N/A} DISK=${disk:-N/A} TOP5=${topproc:-none}"
-}
+    log_event "INFOS" "Chemin des logs résolu: $log_path"
 
-# ------------------------------------------------------------
-# Fonction de corrélation basique avec le log du service
-# ------------------------------------------------------------
-__blackbox_correlate() {
-    local cmd="$1" ts="$2"
-    local svc_log="/var/log/${SERVICE_NAME}/error.log"
-    [ ! -f "$svc_log" ] && return
-    
-    # On cherche des erreurs apparues dans les 2 dernières minutes (approximation)
-    local recent_errors
-    recent_errors=$(tail -200 "$svc_log" 2>/dev/null | grep -iE "error|critical|fail|fatal" | tail -5 | tr '\n' ' ')
-    if [ -n "$recent_errors" ]; then
-        log_event "CORR" "Commande '$cmd' corrélée avec erreur(s) récente(s) : ${recent_errors:0:200}"
-    fi
-}
+    # ── Phase 1 : Profilage Système ──
+    _phase_system_profiling
 
-# ------------------------------------------------------------
-# Liste des patterns dangereux
-# ------------------------------------------------------------
-__blackbox_danger_patterns() {
-    cat <<'EOF'
-rm\s+-rf\s+/
-chmod\s+777\s+/(etc|bin|sbin|lib)
-dd\s+if=.*\s+of=/dev/sd
-mkfs\.
-:(){ :|:& };:
-> /dev/sda
-EOF
-}
-
-__blackbox_danger_check() {
-    local cmd="$1"
-    while read -r pattern; do
-        [ -z "$pattern" ] && continue
-        if echo "$cmd" | grep -Eq "$pattern"; then
-            log_event "DANGER" "Commande dangereuse : $cmd"
-            return
-        fi
-    done < <(__blackbox_danger_patterns)
-}
-
-# ------------------------------------------------------------
-# Hook exécuté juste AVANT chaque commande (trap DEBUG)
-# ------------------------------------------------------------
-__blackbox_watch_precmd() {
-    # On mémorise la date et la taille du log du service avant la commande
-    __BLACKBOX_PRE_TS=$(date '+%Y-%m-%d-%H-%M-%S')
-    if [ -f "/var/log/${SERVICE_NAME}/error.log" ]; then
-        __BLACKBOX_PRE_SIZE=$(stat -c%s "/var/log/${SERVICE_NAME}/error.log" 2>/dev/null || echo 0)
+    # ── Phase 2 : Analyse des Logs (avec ou sans Fork) ──
+    if [ "$FLAG_FORK" = true ]; then
+        _phase_log_forensics_fork "$service" "$log_path"
     else
-        __BLACKBOX_PRE_SIZE=0
+        _phase_log_forensics "$service" "$log_path"
     fi
+
+    # ── Phase 3 : Corrélation Commandes ↔ Erreurs ──
+    _phase_correlation "$service" "$log_path"
+
+    # ── Phase 4 : Génération du Rapport Compressé ──
+    _phase_generate_report "$service"
+
+    echo -e "\n${C_GREEN}╔══════════════════════════════════════════════════════╗${C_RESET}"
+    echo -e "${C_GREEN}║         Analyse terminée avec succès ✓               ${C_RESET}"
+    echo -e "${C_GREEN}╚══════════════════════════════════════════════════════╝${C_RESET}\n"
+    log_event "INFOS" "Analyse forensique terminée pour: $service"
 }
 
-# ------------------------------------------------------------
-# Hook exécuté juste APRÈS chaque commande (PROMPT_COMMAND)
-# ------------------------------------------------------------
-__blackbox_watch_postcmd() {
-    local last_exit=$?
-    local last_cmd cmdline timestamp
-    
-    # Récupérer la dernière commande tapée (sans le numéro d'historique)
-    last_cmd=$(history 1 2>/dev/null | sed 's/^[ ]*[0-9]\+[ ]*//')
-    [ -z "$last_cmd" ] && return
-    
-    # Éviter de capturer le hook lui-même ou des commandes internes
-    [[ "$last_cmd" == "__blackbox_watch_"* ]] && return
-    [[ "$last_cmd" == "history 1" ]] && return
-    
-    timestamp="$__BLACKBOX_PRE_TS"  # on utilise le timestamp d'avant la commande
-    [ -z "$timestamp" ] && timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
-    
-    # 1. Journaliser la commande (CMD)
-    log_event "CMD" "${PWD}: $last_cmd"
-    # 2. Journaliser le code de retour (RET)
-    log_event "RET" "$last_exit"
-    
-    # 3. Snapshot système (SNAP)
-    local snap
-    snap=$(__blackbox_snapshot)
-    log_event "SNAP" "$snap"
-    
-    # 4. Détection de commandes dangereuses
-    __blackbox_danger_check "$last_cmd"
-    
-    # 5. Corrélation avec les logs du service
-    __blackbox_correlate "$last_cmd" "$timestamp"
-}
-
-# ------------------------------------------------------------
-# Installation du hook dans le shell courant
-# ------------------------------------------------------------
-__install_local_hook() {
-    # Ces fonctions sont rendues disponibles dans le shell courant
-    export -f __blackbox_snapshot __blackbox_correlate \
-    __blackbox_danger_check __blackbox_watch_precmd __blackbox_watch_postcmd log_event
-    
-    # On pose le trap DEBUG (avant chaque commande) et PROMPT_COMMAND (après)
-    trap '__blackbox_watch_precmd' DEBUG
-    PROMPT_COMMAND="__blackbox_watch_postcmd;${PROMPT_COMMAND:+$PROMPT_COMMAND}"
-    log_event "INFOS" "Hook Watch activé pour la session courante (shell PID $$)"
-}
-
-# ------------------------------------------------------------
-# Installation système (root) – pour surveillance multi-utilisateurs
-# ------------------------------------------------------------
-__install_system_hook() {
-    local hook_file="/etc/profile.d/blackbox-watch.sh"
-    cat > "$hook_file" << 'HOOK_EOF'
-# Blackbox Watch Hook – installé automatiquement
-export SERVICE_NAME="__SERVICE__"
-export LOG_FILE="__LOG_FILE__"
-export FLAG_VERBOSE="__VERBOSE__"
-# On recharge les fonctions de blackbox depuis le répertoire d'installation
-source /opt/blackbox/src/mode_watch.sh 2>/dev/null || {
-    # Fallback : on définit les fonctions minimales directement
-    # (À compléter si le chemin n'est pas standard – ici on suppose que le sourcing a déjà eu lieu)
-    return
-}
-__install_local_hook
-HOOK_EOF
-    sed -i "s|__SERVICE__|$SERVICE_NAME|g" "$hook_file"
-    sed -i "s|__LOG_FILE__|$LOG_FILE|g" "$hook_file"
-    sed -i "s|__VERBOSE__|$FLAG_VERBOSE|g" "$hook_file"
-    chmod 644 "$hook_file"
-    log_event "INFOS" "Hook système installé dans $hook_file"
-}
-
-# ------------------------------------------------------------
-# Fonction principale du mode Watch
-# ------------------------------------------------------------
-watch_main() {
+# ==============================================================================
+# RÉSOLUTION DU CHEMIN DES LOGS
+# ==============================================================================
+_resolve_log_path() {
     local service="$1"
-    log_event "INFOS" "Lancement du mode Watch pour le service '$service'"
-    
-    # Vérification : pour une surveillance globale, il faut être root
-    if [ "$(id -u)" -eq 0 ]; then
-        log_event "INFOS" "Installation du hook système (global)"
-        __install_system_hook
-    else
-        log_event "WARN" "Pas de privilèges root – hook limité à la session courante"
+    local candidates=(
+        "/var/log/$service"
+        "./tests/sample_logs"
+        "./var/log/$service"
+    )
+    for path in "${candidates[@]}"; do
+        if [ -d "$path" ]; then
+            echo "$path"
+            return 0
+        fi
+    done
+    # Chercher un fichier log direct
+    if [ -f "/var/log/${service}.log" ]; then
+        echo "/var/log"
+        return 0
     fi
-    
-    # Activation locale pour le shell courant (on évite la pollution du rcfile)
-    # On définit d'abord les variables et fonctions, puis on lance bash avec le hook activé via PROMPT_COMMAND
-    export -f __blackbox_snapshot __blackbox_correlate \
-    __blackbox_danger_check __blackbox_danger_patterns \
-    __blackbox_watch_precmd __blackbox_watch_postcmd log_event
-    
-    # On prépare un script temporaire minimal qui sera sourcé par le nouveau shell
-    local temp_rc
-    temp_rc=$(mktemp /tmp/blackbox_rc.XXXXXX)
-    cat > "$temp_rc" <<'EOF'
-# Charger le bashrc habituel s'il existe
-[ -f ~/.bashrc ] && source ~/.bashrc 2>/dev/null
-
-# Définir le piège DEBUG et PROMPT_COMMAND (sans rien afficher)
-trap '__blackbox_watch_precmd' DEBUG
-PROMPT_COMMAND="__blackbox_watch_postcmd;${PROMPT_COMMAND:+$PROMPT_COMMAND}"
-
-# Message discret pour confirmer l'activation (sur stderr, pas dans le rcfile)
-echo "[blackbox] Shell surveillé actif (PID $$)" >&2
-EOF
-    
-    log_event "INFOS" "Session surveillée prête. Lancement d'un shell interactif..."
-    exec bash --rcfile "$temp_rc"
+    echo ""
+    return 1
 }
->>>>>>> 9b3538eb80a919dc39e4e009a8955676c2c888fb
+
+# ==============================================================================
+# PHASE 1 — PROFILAGE SYSTÈME
+# Capture l'état du système au moment de l'analyse
+# ==============================================================================
+_phase_system_profiling() {
+    echo -e "${C_YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+    echo -e "${C_YELLOW}  PHASE 1 — Profilage Système${C_RESET}"
+    echo -e "${C_YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+
+    local ts
+    ts=$(date "+%Y-%m-%d-%H-%M-%S")
+
+    # ── CPU ──
+    local cpu_idle cpu_usage load_avg
+    cpu_idle=$(top -bn1 | grep "Cpu(s)" | awk '{print $8}' | tr -d '%')
+    cpu_usage=$(echo "scale=1; 100 - ${cpu_idle:-0}" | bc 2>/dev/null || echo "N/A")
+    load_avg=$(uptime | awk -F'load average:' '{print $2}' | xargs)
+
+    # ── RAM ──
+    local ram_total ram_used ram_free ram_percent
+    ram_total=$(free -m | awk '/^Mem:/{print $2}')
+    ram_used=$(free -m  | awk '/^Mem:/{print $3}')
+    ram_free=$(free -m  | awk '/^Mem:/{print $4}')
+    ram_percent=$(echo "scale=1; ${ram_used:-0} * 100 / ${ram_total:-1}" | bc 2>/dev/null || echo "N/A")
+
+    # ── Disque ──
+    local disk_info
+    disk_info=$(df -h / | awk 'NR==2{printf "%s utilisé sur %s (%s)", $3, $2, $5}')
+
+    # ── Top 5 Processus CPU ──
+    local top_procs
+    top_procs=$(ps aux --sort=-%cpu 2>/dev/null | awk 'NR>1 && NR<=6{printf "    %-20s CPU: %s%%\n", $11, $3}')
+
+    echo -e "  ${C_GREEN}CPU Usage   :${C_RESET} ${cpu_usage}%"
+    echo -e "  ${C_GREEN}Load Average:${C_RESET} ${load_avg}"
+    echo -e "  ${C_GREEN}RAM         :${C_RESET} ${ram_used}MB / ${ram_total}MB (${ram_percent}% utilisé)"
+    echo -e "  ${C_GREEN}RAM Libre   :${C_RESET} ${ram_free}MB"
+    echo -e "  ${C_GREEN}Disque (/)  :${C_RESET} ${disk_info}"
+    echo -e "  ${C_GREEN}Top Processus par CPU :${C_RESET}"
+    echo -e "${top_procs}"
+
+    local snap_msg="CPU:${cpu_usage}% | RAM:${ram_used}/${ram_total}MB(${ram_percent}%) | Disk:${disk_info} | Load:${load_avg}"
+    log_event "SNAP" "$snap_msg"
+}
+
+# ==============================================================================
+# PHASE 2A — ANALYSE DES LOGS (MODE NORMAL)
+# ==============================================================================
+_phase_log_forensics() {
+    local service="$1"
+    local log_path="$2"
+
+    echo -e "\n${C_YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+    echo -e "${C_YELLOW}  PHASE 2 — Analyse Forensique des Logs${C_RESET}"
+    echo -e "${C_YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+
+    # Trouver tous les fichiers log dans le dossier
+    local log_files
+    mapfile -t log_files < <(find "$log_path" -maxdepth 2 -type f -name "*.log" 2>/dev/null)
+
+    if [ ${#log_files[@]} -eq 0 ]; then
+        log_event "WARN" "Aucun fichier .log trouvé dans $log_path"
+        echo -e "  ${C_YELLOW}[!] Aucun fichier .log trouvé dans $log_path${C_RESET}"
+        return
+    fi
+
+    # Stocker les résultats pour le rapport
+    export ANALYSIS_RESULTS_FILE="/tmp/blackbox_analysis_$$.txt"
+    : > "$ANALYSIS_RESULTS_FILE"
+
+    for log_file in "${log_files[@]}"; do
+        _analyze_single_file "$service" "$log_file"
+    done
+
+    log_event "INFOS" "Analyse des logs terminée — ${#log_files[@]} fichier(s) traité(s)"
+}
+
+# ==============================================================================
+# PHASE 2B — ANALYSE DES LOGS (MODE FORK)
+# Découpe les gros fichiers en 4 morceaux et analyse en parallèle
+# ==============================================================================
+_phase_log_forensics_fork() {
+    local service="$1"
+    local log_path="$2"
+
+    echo -e "\n${C_YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+    echo -e "${C_YELLOW}  PHASE 2 — Analyse Forensique (Mode FORK Parallèle)${C_RESET}"
+    echo -e "${C_YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+
+    log_event "INFOS" "Mode Fork activé — analyse parallèle des logs"
+
+    local log_files
+    mapfile -t log_files < <(find "$log_path" -maxdepth 2 -type f -name "*.log" 2>/dev/null)
+
+    export ANALYSIS_RESULTS_FILE="/tmp/blackbox_analysis_$$.txt"
+    : > "$ANALYSIS_RESULTS_FILE"
+
+    local PIDS=()
+
+    for log_file in "${log_files[@]}"; do
+        local file_size
+        file_size=$(stat -c%s "$log_file" 2>/dev/null || echo 0)
+
+        if [ "$file_size" -gt "$LOG_SIZE_FORK" ]; then
+            echo -e "  ${C_CYAN}[FORK] Fichier volumineux détecté: $(basename "$log_file") ($(( file_size / 1024 / 1024 ))MB)${C_RESET}"
+            echo -e "  ${C_CYAN}[FORK] Découpage en 4 morceaux → analyse parallèle...${C_RESET}"
+
+            local tmp_dir="/tmp/blackbox_fork_$$"
+            mkdir -p "$tmp_dir"
+
+            # Découper le fichier en 4 parties
+            split -n 4 "$log_file" "$tmp_dir/chunk_" 2>/dev/null
+
+            local chunk_results=()
+            for chunk in "$tmp_dir"/chunk_*; do
+                local chunk_result="/tmp/blackbox_chunk_result_${BASHPID}_$(basename "$chunk").txt"
+                chunk_results+=("$chunk_result")
+                (
+                    _analyze_chunk "$chunk" "$chunk_result"
+                ) &
+                PIDS+=($!)
+                echo -e "  ${C_CYAN}[FORK] PID $! → analyse de $(basename "$chunk")${C_RESET}"
+            done
+
+            # Attendre tous les processus fils
+            for pid in "${PIDS[@]}"; do
+                wait "$pid"
+                echo -e "  ${C_GREEN}[FORK] PID $pid terminé ✓${C_RESET}"
+            done
+
+            # Fusionner les résultats
+            _merge_fork_results "${chunk_results[@]}"
+
+            rm -rf "$tmp_dir"
+            log_event "INFOS" "Fork terminé — 4 processus parallèles ont analysé $(basename "$log_file")"
+
+        else
+            # Fichier petit → analyse normale
+            (
+                _analyze_single_file "$service" "$log_file"
+            ) &
+            PIDS+=($!)
+        fi
+    done
+
+    # Attendre tous les processus restants
+    for pid in "${PIDS[@]}"; do
+        wait "$pid" 2>/dev/null
+    done
+
+    log_event "INFOS" "Analyse Fork terminée — ${#log_files[@]} fichier(s) traité(s)"
+}
+
+# ==============================================================================
+# ANALYSE D'UN SEUL FICHIER LOG
+# ==============================================================================
+_analyze_single_file() {
+    local service="$1"
+    local log_file="$2"
+    local filename
+    filename=$(basename "$log_file")
+
+    echo -e "\n  ${C_BLUE}▶ Fichier: $filename${C_RESET}"
+
+    # ── IPs Uniques + Fréquences ──
+    echo -e "  ${C_GREEN}Top IPs connectées:${C_RESET}"
+    local top_ips
+    top_ips=$(grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' "$log_file" 2>/dev/null \
+        | sort | uniq -c | sort -rn | head -"$MAX_LINES_DISPLAY")
+
+    if [ -n "$top_ips" ]; then
+        echo "$top_ips" | while read -r count ip; do
+            echo -e "    ${count}x  →  ${ip}"
+        done
+        # Sauvegarder pour le rapport
+        echo "=== TOP IPs ($filename) ===" >> "$ANALYSIS_RESULTS_FILE"
+        echo "$top_ips" >> "$ANALYSIS_RESULTS_FILE"
+    else
+        echo -e "    ${C_YELLOW}Aucune IP trouvée${C_RESET}"
+    fi
+
+    # ── Comptage Erreurs HTTP ──
+    local count_404 count_500 count_403 count_502
+    count_404=$(grep -c " 404 " "$log_file" 2>/dev/null)
+    count_500=$(grep -c " 500 " "$log_file" 2>/dev/null)
+    count_403=$(grep -c " 403 " "$log_file" 2>/dev/null)
+    count_502=$(grep -c " 502 " "$log_file" 2>/dev/null)
+    count_404=${count_404:-0}
+    count_500=${count_500:-0}
+    count_403=${count_403:-0}
+    count_502=${count_502:-0}
+
+    echo -e "  ${C_GREEN}Erreurs HTTP:${C_RESET}"
+    echo -e "    404 (Not Found)       : ${count_404}"
+    echo -e "    403 (Forbidden)       : ${count_403}"
+    echo -e "    500 (Server Error)    : ${count_500}"
+    echo -e "    502 (Bad Gateway)     : ${count_502}"
+
+    echo "=== ERREURS HTTP ($filename) ===" >> "$ANALYSIS_RESULTS_FILE"
+    echo "404: $count_404 | 403: $count_403 | 500: $count_500 | 502: $count_502" >> "$ANALYSIS_RESULTS_FILE"
+
+    # ── Logs des 15 dernières minutes ──
+    echo -e "  ${C_GREEN}Activité (15 dernières minutes):${C_RESET}"
+    local cutoff_time
+    cutoff_time=$(date -d '15 minutes ago' '+%d/%b/%Y:%H:%M' 2>/dev/null \
+        || date -v-15M '+%d/%b/%Y:%H:%M' 2>/dev/null \
+        || echo "")
+
+    if [ -n "$cutoff_time" ]; then
+        local recent_count
+        recent_count=$(awk -v cutoff="$cutoff_time" '$0 ~ cutoff || $0 > cutoff' "$log_file" 2>/dev/null | wc -l)
+        echo -e "    ${recent_count} ligne(s) depuis ${cutoff_time}"
+
+        local recent_errors
+        recent_errors=$(awk -v cutoff="$cutoff_time" '$0 ~ cutoff || $0 > cutoff' "$log_file" 2>/dev/null \
+            | grep -E " (404|500|403|502) " | head -5)
+
+        if [ -n "$recent_errors" ]; then
+            echo -e "    ${C_RED}Erreurs récentes:${C_RESET}"
+            echo "$recent_errors" | while IFS= read -r line; do
+                echo -e "    ${C_RED}→${C_RESET} $line"
+            done
+        fi
+    fi
+
+    log_event "INFOS" "Fichier analysé: $filename | 404:${count_404} 500:${count_500} 403:${count_403} 502:${count_502}"
+}
+
+# ==============================================================================
+# ANALYSE D'UN CHUNK (pour Fork)
+# ==============================================================================
+_analyze_chunk() {
+    local chunk_file="$1"
+    local result_file="$2"
+
+    local count_404 count_500 top_ips
+    count_404=$(grep -c " 404 " "$chunk_file" 2>/dev/null || echo 0)
+    count_500=$(grep -c " 500 " "$chunk_file" 2>/dev/null || echo 0)
+    top_ips=$(grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' "$chunk_file" 2>/dev/null \
+        | sort | uniq -c | sort -rn | head -5)
+
+    {
+        echo "CHUNK: $(basename "$chunk_file")"
+        echo "404: $count_404"
+        echo "500: $count_500"
+        echo "TOP_IPS:"
+        echo "$top_ips"
+        echo "---"
+    } > "$result_file"
+}
+
+# ==============================================================================
+# FUSIONNER LES RÉSULTATS DES CHUNKS FORK
+# ==============================================================================
+_merge_fork_results() {
+    local result_files=("$@")
+    local total_404=0 total_500=0
+
+    echo -e "\n  ${C_GREEN}═══ Résultats fusionnés (Fork) ═══${C_RESET}"
+
+    for result_file in "${result_files[@]}"; do
+        if [ -f "$result_file" ]; then
+            local c404 c500
+            c404=$(grep "^404:" "$result_file" | awk -F': ' '{print $2}')
+            c500=$(grep "^500:" "$result_file" | awk -F': ' '{print $2}')
+            total_404=$(( total_404 + ${c404:-0} ))
+            total_500=$(( total_500 + ${c500:-0} ))
+
+            cat "$result_file" >> "$ANALYSIS_RESULTS_FILE"
+            rm -f "$result_file"
+        fi
+    done
+
+    echo -e "  Total 404 : ${total_404}"
+    echo -e "  Total 500 : ${total_500}"
+    log_event "INFOS" "Fusion Fork — Total: 404:${total_404} | 500:${total_500}"
+}
+
+# ==============================================================================
+# PHASE 3 — CORRÉLATION COMMANDES ↔ ERREURS
+# Compare les timestamps de history.log avec les erreurs des logs service
+# C'est la fonctionnalité UNIQUE de BLACKBOX
+# ==============================================================================
+_phase_correlation() {
+    local service="$1"
+    local log_path="$2"
+
+    echo -e "\n${C_YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+    echo -e "${C_YELLOW}  PHASE 3 — Corrélation Commandes ↔ Erreurs ⭐${C_RESET}"
+    echo -e "${C_YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+
+    # Vérifier si history.log existe
+    if [ ! -f "$LOG_FILE" ]; then
+        echo -e "  ${C_YELLOW}[!] Aucun history.log trouvé — Corrélation impossible${C_RESET}"
+        echo -e "  ${C_YELLOW}[!] Lancez d'abord: blackbox -w $service${C_RESET}"
+        log_event "WARN" "Corrélation ignorée — history.log introuvable"
+        return
+    fi
+
+    # Extraire les commandes enregistrées par Dev 1 (mode -w)
+    local cmd_lines
+    mapfile -t cmd_lines < <(grep " : CMD : " "$LOG_FILE" 2>/dev/null)
+
+    if [ ${#cmd_lines[@]} -eq 0 ]; then
+        echo -e "  ${C_YELLOW}[!] Aucune commande enregistrée dans history.log${C_RESET}"
+        log_event "WARN" "Aucune commande CMD trouvée dans history.log pour corrélation"
+        return
+    fi
+
+    echo -e "  ${C_CYAN}${#cmd_lines[@]} commande(s) enregistrée(s) trouvée(s)${C_RESET}"
+    echo -e "  ${C_CYAN}Recherche de corrélations avec les erreurs du service $service...${C_RESET}\n"
+
+    local corr_count=0
+    export CORR_RESULTS_FILE="/tmp/blackbox_corr_$$.txt"
+    : > "$CORR_RESULTS_FILE"
+
+    # Pour chaque commande enregistrée dans history.log
+    for cmd_line in "${cmd_lines[@]}"; do
+        # Format: 2026-04-21-02-17-43 : polo : CMD : systemctl restart nginx
+        local cmd_ts cmd_user cmd_text
+        cmd_ts=$(echo "$cmd_line" | awk -F' : ' '{print $1}' | xargs)
+        cmd_user=$(echo "$cmd_line" | awk -F' : ' '{print $2}' | xargs)
+        cmd_text=$(echo "$cmd_line" | awk -F' : CMD : ' '{print $2}' | xargs)
+
+        # Convertir le timestamp CMD en secondes epoch
+        local cmd_epoch
+        cmd_epoch=$(_ts_to_epoch "$cmd_ts")
+        [ -z "$cmd_epoch" ] && continue
+
+        # Chercher des erreurs dans les logs du service dans la fenêtre de temps
+        local error_found
+        error_found=$(_find_errors_near_timestamp "$log_path" "$cmd_epoch" "$DANGER_THRESHOLD")
+
+        if [ -n "$error_found" ]; then
+            corr_count=$(( corr_count + 1 ))
+            local diff_sec
+            diff_sec=$(echo "$error_found" | awk '{print $1}')
+            local error_msg
+            error_msg=$(echo "$error_found" | cut -d' ' -f2-)
+
+            echo -e "  ${C_BRED}⚠ CORRÉLATION DÉTECTÉE:${C_RESET}"
+            echo -e "    ${C_GREEN}→ À ${cmd_ts}${C_RESET}"
+            echo -e "    ${C_GREEN}→ ${cmd_user} a exécuté: ${cmd_text}${C_RESET}"
+            echo -e "    ${C_RED}→ ${diff_sec}s plus tard: ${error_msg}${C_RESET}"
+            echo -e "    ${C_YELLOW}→ CAUSE PROBABLE IDENTIFIÉE${C_RESET}\n"
+
+            # Écrire dans history.log (type CORR)
+            local corr_msg="${cmd_text} → [+${diff_sec}s] ${error_msg}"
+            log_event "CORR" "$corr_msg"
+
+            # Sauvegarder pour le rapport
+            echo "CORRELATION: $cmd_ts | USER:$cmd_user | CMD:$cmd_text | ERROR:[+${diff_sec}s] $error_msg" \
+                >> "$CORR_RESULTS_FILE"
+        fi
+    done
+
+    if [ "$corr_count" -eq 0 ]; then
+        echo -e "  ${C_GREEN}✓ Aucune corrélation suspecte détectée${C_RESET}"
+        log_event "INFOS" "Corrélation terminée — Aucun incident détecté"
+    else
+        echo -e "  ${C_RED}✗ ${corr_count} corrélation(s) suspecte(s) détectée(s)${C_RESET}"
+        log_event "INFOS" "Corrélation terminée — ${corr_count} incident(s) identifié(s)"
+    fi
+}
+
+# ==============================================================================
+# CONVERTIR TIMESTAMP blackbox → EPOCH SECONDES
+# Format: 2026-04-21-02-17-43 → secondes depuis epoch
+# ==============================================================================
+_ts_to_epoch() {
+    local ts="$1"
+    # Format: YYYY-MM-DD-HH-MM-SS
+    local formatted
+    formatted=$(echo "$ts" | sed 's/\([0-9]\{4\}\)-\([0-9]\{2\}\)-\([0-9]\{2\}\)-\([0-9]\{2\}\)-\([0-9]\{2\}\)-\([0-9]\{2\}\)/\1-\2-\3 \4:\5:\6/')
+    date -d "$formatted" "+%s" 2>/dev/null || echo ""
+}
+
+# ==============================================================================
+# CHERCHER DES ERREURS DANS LES LOGS PROCHES D'UN TIMESTAMP
+# ==============================================================================
+_find_errors_near_timestamp() {
+    local log_path="$1"
+    local cmd_epoch="$2"
+    local threshold="$3"
+
+    local log_files
+    mapfile -t log_files < <(find "$log_path" -maxdepth 2 -type f -name "*.log" 2>/dev/null)
+
+    for log_file in "${log_files[@]}"; do
+        # Chercher des lignes d'erreur dans le fichier
+        while IFS= read -r error_line; do
+            # Extraire le timestamp de la ligne d'erreur
+            # Formats courants nginx: 2026/04/21 02:17:45
+            # Format apache: [Mon Apr 21 02:17:45.000 2026]
+            local err_epoch
+            err_epoch=$(_extract_log_timestamp "$error_line")
+            [ -z "$err_epoch" ] && continue
+
+            local diff=$(( err_epoch - cmd_epoch ))
+
+            # Si l'erreur est dans la fenêtre [0, threshold] secondes après la commande
+            if [ "$diff" -ge 0 ] && [ "$diff" -le "$threshold" ]; then
+                local short_error
+                short_error=$(echo "$error_line" | cut -c1-100)
+                echo "$diff $short_error"
+                return 0
+            fi
+        done < <(grep -iE "(error|crit|alert|emerg|500|502|503)" "$log_file" 2>/dev/null | head -100)
+    done
+
+    echo ""
+}
+
+# ==============================================================================
+# EXTRAIRE LE TIMESTAMP D'UNE LIGNE DE LOG
+# ==============================================================================
+_extract_log_timestamp() {
+    local line="$1"
+    local epoch=""
+
+    # Format nginx: 2026/04/25 20:31:06
+    if echo "$line" | grep -qE '[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}'; then
+        local raw cleaned
+        raw=$(echo "$line" | grep -oE '[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}' | head -1)
+        cleaned=$(echo "$raw" | sed 's|/|-|g')
+        epoch=$(date -d "$cleaned" "+%s" 2>/dev/null || echo "")
+
+    # Format apache: [21/Apr/2026:02:17:45
+    elif echo "$line" | grep -qE '\[[0-9]{2}/[A-Za-z]{3}/[0-9]{4}:[0-9]{2}:[0-9]{2}:[0-9]{2}'; then
+        local raw cleaned
+        raw=$(echo "$line" | grep -oE '[0-9]{2}/[A-Za-z]{3}/[0-9]{4}:[0-9]{2}:[0-9]{2}:[0-9]{2}' | head -1)
+        cleaned=$(echo "$raw" | sed 's|/| |g' | sed 's/:/ /' )
+        epoch=$(date -d "$cleaned" "+%s" 2>/dev/null || echo "")
+
+    # Format syslog: Apr 21 02:17:45
+    elif echo "$line" | grep -qE '[A-Za-z]{3} +[0-9]{1,2} [0-9]{2}:[0-9]{2}:[0-9]{2}'; then
+        local raw
+        raw=$(echo "$line" | grep -oE '[A-Za-z]{3} +[0-9]{1,2} [0-9]{2}:[0-9]{2}:[0-9]{2}' | head -1)
+        epoch=$(date -d "$raw" "+%s" 2>/dev/null || echo "")
+    fi
+
+    echo "$epoch"
+}
+
+# ==============================================================================
+# PHASE 4 — GÉNÉRATION DU RAPPORT COMPRESSÉ
+# ==============================================================================
+_phase_generate_report() {
+    local service="$1"
+    local ts
+    ts=$(date "+%Y-%m-%d_%H-%M-%S")
+    local report_name="${ts}_${service}_report"
+    local report_txt="/tmp/${report_name}.txt"
+    local archive_path="${ARCHIVE_DIR}/${report_name}.tar.gz"
+
+    echo -e "\n${C_YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+    echo -e "${C_YELLOW}  PHASE 4 — Génération du Rapport${C_RESET}"
+    echo -e "${C_YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+
+    # Créer le rapport texte
+    {
+        echo "============================================================"
+        echo "  BLACKBOX — Rapport d'Analyse Forensique"
+        echo "  Service  : $service"
+        echo "  Date     : $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "  Généré   : $(whoami)@$(hostname)"
+        echo "============================================================"
+        echo ""
+
+        echo "── PROFILAGE SYSTÈME ──"
+        echo "CPU Usage   : $(top -bn1 | grep "Cpu(s)" | awk '{print 100-$8"%"}')"
+        echo "RAM         : $(free -m | awk '/^Mem:/{print $3"MB/"$2"MB"}')"
+        echo "Disque (/)  : $(df -h / | awk 'NR==2{print $3"/"$2" ("$5")"}')"
+        echo "Load Avg    : $(uptime | awk -F'load average:' '{print $2}')"
+        echo ""
+
+        echo "── ANALYSE DES LOGS ──"
+        if [ -f "$ANALYSIS_RESULTS_FILE" ]; then
+            cat "$ANALYSIS_RESULTS_FILE"
+        fi
+        echo ""
+
+        echo "── CORRÉLATIONS DÉTECTÉES ──"
+        if [ -f "$CORR_RESULTS_FILE" ]; then
+            cat "$CORR_RESULTS_FILE"
+        else
+            echo "Aucune corrélation enregistrée."
+        fi
+        echo ""
+
+        echo "============================================================"
+        echo "  Fin du rapport — BLACKBOX v1.0"
+        echo "============================================================"
+    } > "$report_txt"
+
+    # Comprimer le rapport
+    mkdir -p "$ARCHIVE_DIR"
+    tar -czf "$archive_path" -C /tmp "${report_name}.txt" 2>/dev/null
+
+    if [ -f "$archive_path" ]; then
+        echo -e "  ${C_GREEN}✓ Rapport généré:${C_RESET}"
+        echo -e "    ${archive_path}"
+        local size
+        size=$(du -h "$archive_path" | awk '{print $1}')
+        echo -e "    Taille: ${size}"
+        log_event "INFOS" "Rapport compressé généré: $archive_path ($size)"
+    else
+        log_event "ERROR" "Échec de la génération du rapport compressé"
+    fi
+
+    # Nettoyage fichiers temporaires
+    rm -f "$report_txt" "$ANALYSIS_RESULTS_FILE" "$CORR_RESULTS_FILE" 2>/dev/null
+}
