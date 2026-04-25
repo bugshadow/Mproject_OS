@@ -4,7 +4,7 @@
 # BLACKBOX - Boîte Noire pour Serveurs Linux
 # ============================================
 
-# ── Variables globales (partagées par tous) ──
+# ── Variables globales (partagees par tous) ──
 
 LOG_DIR="/var/log/blackbox"
 LOG_FILE="$LOG_DIR/history.log"
@@ -24,7 +24,7 @@ log_event() {
     local timestamp=$(date "+%Y-%m-%d-%H-%M-%S")
     local username=$(whoami)
     local line="$timestamp : $username : $type : $message"
-
+    
     # Double sortie obligatoire
     echo "$line"
     flock "$LOG_FILE" -c "echo '$line' >> '$LOG_FILE'"
@@ -40,11 +40,11 @@ display_help() {
     echo "  -a         Analyze Mode: analyse forensique"
     echo "  -p         Playback Mode: rejeu de session"
     echo "  -s         Subshell    : isole dans un sous-shell"
-    echo "  -f         Fork        : analyse en parallèle"
-    echo "  -t         Thread      : compression multithreadée"
-    echo "  -l <rep>   Log Dir     : répertoire personnalisé"
+    echo "  -f         Fork        : analyse en parallele"
+    echo "  -t         Thread      : compression multithreadee"
+    echo "  -l <rep>   Log Dir     : repertoire personnalise"
     echo "  -r         Restore     : reset (root uniquement)"
-    echo "  -v         Verbose     : mode débogage"
+    echo "  -v         Verbose     : mode debogage"
     echo ""
     echo "Exemples:"
     echo "  blackbox -w nginx"
@@ -53,7 +53,7 @@ display_help() {
     echo "  blackbox -p 2026-04-21_14-30-00"
 }
 
-# ── Gestion des erreurs (codes définis dans le cahier de charge) ──
+# ── Gestion des erreurs (codes definis dans le cahier de charge) ──
 die() {
     local code="$1"
     local message="$2"
@@ -90,7 +90,7 @@ init_environment() {
     ARCHIVE_DIR="$LOG_DIR/archives"
     mkdir -p "$LOG_DIR" "$ARCHIVE_DIR"
     touch "$LOG_FILE"
-    log_event "INFOS" "blackbox démarré — service: $SERVICE_NAME — mode: $MODE"
+    log_event "INFOS" "blackbox demarre — service: $SERVICE_NAME — mode: $MODE"
 }
 
 # ── Validation ──
@@ -101,31 +101,31 @@ validate() {
         local log_path="/var/log/$SERVICE_NAME"
         [ ! -d "$log_path" ] && die 102 "Dossier de logs introuvable: $log_path"
     fi
-
+    
     if [ "$MODE" = "playback" ]; then
-        [ ! -f "$LOG_FILE" ] && die 104 "Fichier history.log non trouvé"
+        [ ! -f "$LOG_FILE" ] && die 104 "Fichier history.log non trouve"
     fi
 }
 
-# ── Stubs pour Dev 2 et Dev 3 (ils remplissent ces fonctions) ──
+# ── Stubs pour Abdelaali et Omar (ils remplissent ces fonctions) ──
 mode_watch()    { source ./src/mode_watch.sh;    watch_main "$SERVICE_NAME"; }
 mode_analyze()  { source ./src/mode_analyze.sh;  analyze_main "$SERVICE_NAME"; }
 mode_playback() { source ./src/mode_playback.sh; playback_main "$SERVICE_NAME"; }
-mode_restore()  { 
-    [ "$(id -u)" != "0" ] && die 103 "Privilèges root requis pour -r"
+mode_restore()  {
+    [ "$(id -u)" != "0" ] && die 103 "Privileges root requis pour -r"
     rm -rf "$LOG_DIR"
-    log_event "INFOS" "Environnement réinitialisé"
+    log_event "INFOS" "Environnement reinitialise"
 }
 
-# ── Point d'entrée principal ──
+# ── Point d'entree principal ──
 main() {
     parse_options "$@"
     init_environment
     validate
-
+    
     # Subshell si -s
     if $FLAG_SUBSHELL; then
-        ( run_mode ) &   # exécute dans un sous-shell en arrière-plan
+        ( run_mode ) &   # execute dans un sous-shell en arriere-plan
     else
         run_mode
     fi
@@ -136,7 +136,7 @@ run_mode() {
         watch)    mode_watch ;;
         analyze)  mode_analyze ;;
         playback) mode_playback ;;
-        *) die 100 "Aucun mode spécifié" ;;
+        *) die 100 "Aucun mode specifie" ;;
     esac
 }
 
