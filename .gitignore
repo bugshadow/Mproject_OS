@@ -3,7 +3,7 @@ bin/
 compress_helper
 
 # Dossiers temporaires et logs locaux
-
+var/
 .DS_Store
 
 # Fichiers de test très volumineux
