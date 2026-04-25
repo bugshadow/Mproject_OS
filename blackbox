@@ -68,8 +68,6 @@ init_environment() {
         mkdir -p "$LOG_DIR" "$ARCHIVE_DIR"
         touch "$LOG_FILE"
     fi
-    
-    [ -n "$MODE" ] && log_event "INFOS" "blackbox démarré — service: ${SERVICE_NAME:-N/A} — mode: $MODE"
 }
 
 # ── Validation ──
@@ -100,6 +98,7 @@ mode_restore() {
 
 # ── Dispatcher (Exécution du bon mode) ──
 run_mode() {
+    [ -n "$MODE" ] && log_event "INFOS" "blackbox démarré — service: ${SERVICE_NAME:-N/A} — mode: $MODE"
     case "$MODE" in
         watch)    watch_main "$SERVICE_NAME" ;;
         analyze)  analyze_main "$SERVICE_NAME" ;;

@@ -14,8 +14,9 @@ blackbox_log_cmd() {
         log_event "CMD" "${PWD} : ${cmd}"
         log_event "RET" "${exit_code}"
         
-        # Détection des commandes dangereuses (Regex Bash)
-        if [[ "$cmd" =~ rm\ -rf\ /|chmod\ 777\ /etc|dd\ if=/dev/zero|mkfs|:\(\)\{[ ]*:\|:\&[ ]*\};:|>\ /dev/sda ]]; then
+        # Détection des commandes dangereuses (Regex Bash dans une variable pour éviter les erreurs de syntaxe)
+        local danger_pattern='rm -rf /|chmod 777 /etc|dd if=/dev/zero|mkfs|:\(\)\{.*\}|> /dev/sda'
+        if [[ "$cmd" =~ $danger_pattern ]]; then
             log_event "DANGER" "Commande critique détectée : $cmd"
             echo -e "${C_BRED}[⚠] ALERTE ROUGE : Exécution d'une commande destructrice détectée !${C_RESET}"
         fi
