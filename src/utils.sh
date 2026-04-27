@@ -23,9 +23,21 @@ log_event() {
         "INFOS")  echo -e "${C_GREEN}[✓] ${msg}${C_RESET}" ;;
         "ERROR")  echo -e "${C_RED}[✗] ${msg}${C_RESET}" >&2 ;;
         "WARN")   echo -e "${C_YELLOW}[!] ${msg}${C_RESET}" ;;
-        "DANGER") echo -e "${C_BRED}[⚠] DANGER: ${msg}${C_RESET}" >&2 ;;
-        "CMD"|"RET"|"SNAP"|"CORR") 
-            [ "$FLAG_VERBOSE" = true ] && echo -e "${C_CYAN}[▶] ${type} : ${msg}${C_RESET}" 
+        "DANGER") echo -e "\n${C_BRED}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n┃   ALERTE DANGER : ${msg}\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${C_RESET}\n" >&2 ;;
+        "CMD") 
+            [ "$FLAG_VERBOSE" = true ] && echo -e "${C_BLUE}╭──[  Commande ]─────────────────────────────────────────${C_RESET}\n${C_BLUE}│${C_RESET} ${C_CYAN}${msg}${C_RESET}" 
+            ;;
+        "RET")
+            local ret_color="${C_GREEN}Succès"
+            [ "$msg" != "0" ] && ret_color="${C_RED}Erreur"
+            [ "$FLAG_VERBOSE" = true ] && echo -e "${C_BLUE}│${C_RESET} ↳ Résultat : ${ret_color} (Code ${msg})${C_RESET}"
+            ;;
+        "SNAP")
+            local pretty_snap=$(echo "$msg" | sed -e 's/CPU=/\x1b[33mCPU:\x1b[0m /' -e 's/MEM=/\x1b[33mRAM:\x1b[0m /' -e 's/DISK=/\x1b[33mDisque:\x1b[0m /' -e 's/TOP5=/\n\x1b[34m│\x1b[0m ↳ \x1b[33mTop 5 Processus:\x1b[0m /')
+            [ "$FLAG_VERBOSE" = true ] && echo -e "${C_BLUE}│${C_RESET}  Paramètres : ${pretty_snap}\n${C_BLUE}╰──────────────────────────────────────────────────────────${C_RESET}"
+            ;;
+        "CORR")
+            [ "$FLAG_VERBOSE" = true ] && echo -e "${C_BRED}╭──[  CORRÉLATION DÉTECTÉE ]─────────────────────────────${C_RESET}\n${C_BRED}│${C_RESET} ${C_YELLOW}${msg}${C_RESET}\n${C_BRED}╰──────────────────────────────────────────────────────────${C_RESET}"
             ;;
         *) echo "$line" ;;
     esac
@@ -119,8 +131,8 @@ EOF
 die() {
     local code="$1"
     local message="$2"
-    print_banner
     log_event "ERROR" "$message"
-    echo -e "${C_CYAN}Tapez './blackbox -h' pour plus d'informations.${C_RESET}"
+    echo ""
+    display_help
     exit "$code"
 }
