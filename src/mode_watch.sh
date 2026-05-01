@@ -175,17 +175,22 @@ export LOG_FILE="__LOG_FILE__"
 export FLAG_VERBOSE="__VERBOSE__"
 export FLAG_NO_STDOUT="true"
 
-# Rechargement des fonctions
-source __INSTALL_DIR__/src/utils.sh 2>/dev/null
-source __INSTALL_DIR__/src/mode_watch.sh 2>/dev/null
-
-# Message de bienvenue pour tous les utilisateurs (Audit Visuel)
-if [ -z "$__BLACKBOX_BANNER_SHOWN" ]; then
-    echo -e "\e[1;31m[!] SURVEILLANCE ACTIVÉE : Ce shell est enregistré par Blackbox.\e[0m"
-    export __BLACKBOX_BANNER_SHOWN="true"
+# Rechargement des fonctions (Vérification de lisibilité)
+if [ -r "__INSTALL_DIR__/src/utils.sh" ] && [ -r "__INSTALL_DIR__/src/mode_watch.sh" ]; then
+    source __INSTALL_DIR__/src/utils.sh
+    source __INSTALL_DIR__/src/mode_watch.sh
+    
+    # Message de bienvenue (Audit Visuel)
+    if [ -z "$__BLACKBOX_BANNER_SHOWN" ]; then
+        echo -e "\e[1;31m[!] SURVEILLANCE ACTIVÉE : Ce shell est enregistré par Blackbox.\e[0m"
+        export __BLACKBOX_BANNER_SHOWN="true"
+    fi
+    
+    __install_local_hook
+else
+    echo -e "\e[1;33m[!] Blackbox Error : Impossible de lire les fichiers sources dans __INSTALL_DIR__/src/.\e[0m"
+    echo -e "\e[1;90m(Vérifiez les permissions du dossier personnel de l'administrateur)\e[0m"
 fi
-
-__install_local_hook
 HOOK_EOF
     sed -i "s|__SERVICE__|$SERVICE_NAME|g" "$hook_file"
     sed -i "s|__LOG_FILE__|$LOG_FILE|g" "$hook_file"

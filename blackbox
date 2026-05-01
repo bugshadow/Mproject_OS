@@ -99,6 +99,9 @@ init_environment() {
     
     export ARCHIVE_DIR="$LOG_DIR/archives"
     
+    # S'assurer que le dossier src est accessible à tous pour le sourcing du hook
+    [ -d "src" ] && chmod -R 755 src 2>/dev/null
+    
     if [ "$MODE" != "restore" ]; then
         # On tente de créer les dossiers (silencieusement si déjà présents ou erreur de droits)
         mkdir -p "$LOG_DIR" "$ARCHIVE_DIR" 2>/dev/null
