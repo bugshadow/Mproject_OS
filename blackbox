@@ -17,6 +17,8 @@ export C_CYAN="\e[36m"
 export C_BRED="\e[1;31m"
 
 # ── Variables Globales ──
+# Configuration des répertoires par défaut
+# Note: Le cahier des charges demande impérativement /var/log/blackbox
 export LOG_DIR="/var/log/blackbox"
 export SERVICE_NAME=""
 export MODE=""
@@ -81,7 +83,20 @@ init_environment() {
         LOG_DIR="$CUSTOM_LOG_DIR"
         export LOG_DIR
     fi
-    export LOG_FILE="$LOG_DIR/history.log"
+    
+    # Création du dossier de logs s'il n'existe pas
+    if [ ! -d "$LOG_DIR" ]; then
+        mkdir -p "$LOG_DIR" 2>/dev/null
+        # Pour le mode multi-utilisateur, le dossier doit être accessible en écriture
+        chmod 777 "$LOG_DIR" 2>/dev/null
+    fi
+
+    # Fichier de log spécifique
+    export LOG_FILE="${LOG_DIR}/history.log"
+    # S'assurer que le fichier est accessible en écriture pour tous les utilisateurs surveillés
+    [ ! -f "$LOG_FILE" ] && touch "$LOG_FILE" 2>/dev/null
+    chmod 666 "$LOG_FILE" 2>/dev/null
+    
     export ARCHIVE_DIR="$LOG_DIR/archives"
     
     if [ "$MODE" != "restore" ]; then

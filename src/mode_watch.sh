@@ -173,14 +173,18 @@ __install_system_hook() {
 export SERVICE_NAME="__SERVICE__"
 export LOG_FILE="__LOG_FILE__"
 export FLAG_VERBOSE="__VERBOSE__"
-export FLAG_NO_STDOUT="true" # Pour éviter que les logs s'affichent partout
-# On recharge les fonctions de blackbox depuis le répertoire d'installation
+export FLAG_NO_STDOUT="true"
+
+# Rechargement des fonctions
 source __INSTALL_DIR__/src/utils.sh 2>/dev/null
-source __INSTALL_DIR__/src/mode_watch.sh 2>/dev/null || {
-    # Fallback : on définit les fonctions minimales directement
-    # (À compléter si le chemin n'est pas standard – ici on suppose que le sourcing a déjà eu lieu)
-    return
-}
+source __INSTALL_DIR__/src/mode_watch.sh 2>/dev/null
+
+# Message de bienvenue pour tous les utilisateurs (Audit Visuel)
+if [ -z "$__BLACKBOX_BANNER_SHOWN" ]; then
+    echo -e "\e[1;31m[!] SURVEILLANCE ACTIVÉE : Ce shell est enregistré par Blackbox.\e[0m"
+    export __BLACKBOX_BANNER_SHOWN="true"
+fi
+
 __install_local_hook
 HOOK_EOF
     sed -i "s|__SERVICE__|$SERVICE_NAME|g" "$hook_file"
@@ -214,6 +218,13 @@ watch_main() {
                 log_event "INFOS" "Fix automatique des permissions du dossier personnel..."
                 chmod 755 "$user_home" 2>/dev/null
             fi
+        fi
+
+        # Alerte Spéciale WSL / Partition Windows
+        if [[ "$(pwd)" == /mnt/* ]]; then
+            log_event "WARN" "ATTENTION : Vous êtes sur une partition Windows (/mnt/)."
+            log_event "WARN" "La capture multi-utilisateurs risque d'échouer à cause des permissions WSL."
+            log_event "INFOS" "Conseil : Déplacez le projet dans /home/ pour un test 100% fonctionnel."
         fi
     else
         log_event "WARN" "Pas de privilèges root – hook limité à la session courante"

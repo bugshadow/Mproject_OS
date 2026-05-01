@@ -43,7 +43,10 @@ log_event() {
     # Écriture atomique dans le fichier
     if [ -n "$LOG_FILE" ] && [ -d "$(dirname "$LOG_FILE")" ]; then
         # On s'assure que le fichier existe avant d'écrire (si le répertoire est accessible)
-        [ ! -f "$LOG_FILE" ] && touch "$LOG_FILE" 2>/dev/null
+        if [ ! -f "$LOG_FILE" ]; then
+            touch "$LOG_FILE" 2>/dev/null
+            chmod 666 "$LOG_FILE" 2>/dev/null
+        fi
         
         (
             flock -w 2 200
