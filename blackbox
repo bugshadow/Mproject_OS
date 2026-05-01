@@ -33,6 +33,14 @@ source ./src/mode_watch.sh
 source ./src/mode_analyze.sh
 source ./src/mode_playback.sh
 
+# ── Fonction pour quitter sans afficher l'aide ──
+die_no_help() {
+    local code="$1"
+    local msg="$2"
+    echo -e "${C_RED}[✗] ${msg}${C_RESET}" >&2
+    exit "$code"
+}
+
 # ── Parse des options (Getopts complet - Fondation Dev 1) ──
 parse_options() {
     while getopts ":hwap:sftl:rv" opt; do
@@ -65,8 +73,9 @@ init_environment() {
     export ARCHIVE_DIR="$LOG_DIR/archives"
     
     if [ "$MODE" != "restore" ]; then
-        mkdir -p "$LOG_DIR" "$ARCHIVE_DIR"
-        touch "$LOG_FILE"
+        # On empêche l'affichage d'erreurs moches "mkdir: cannot create directory"
+        mkdir -p "$LOG_DIR" "$ARCHIVE_DIR" 2>/dev/null
+        touch "$LOG_FILE" 2>/dev/null
     fi
 }
 
@@ -74,18 +83,24 @@ init_environment() {
 validate() {
     [ "$MODE" = "restore" ] && return
     
-    [ -z "$SERVICE_NAME" ] && die 101 "Service name manquant"
+    [ -z "$SERVICE_NAME" ] && die_no_help 101 "Service name manquant. Usage: blackbox [OPTIONS] <SERVICE_NAME>"
     
     if [ "$MODE" = "analyze" ] || [ "$MODE" = "watch" ]; then
         local log_path="/var/log/$SERVICE_NAME"
         if [[ "$LOG_DIR" == *"./var/log"* || "$LOG_DIR" == *"var/log"* ]]; then
             log_path="./tests/sample_logs"
         fi
-        [ ! -d "$log_path" ] && [ ! -d "/var/log/$SERVICE_NAME" ] && die 102 "Dossier de logs introuvable pour $SERVICE_NAME"
+        
+        # Test silencieux pour vérifier si on a les droits grâce à l'échec de la création du dossier/fichier plus haut
+        if [ ! -w "$LOG_FILE" ] && [ ! -d "$LOG_DIR" ]; then
+             die_no_help 103 "Permission refusée. Vous n'avez pas le droit d'écrire dans /var/log/blackbox.\nSolution: Utilisez 'sudo' ou utilisez un dossier local avec l'option '-l ./var_local/log'"
+        fi
+
+        [ ! -d "$log_path" ] && [ ! -d "/var/log/$SERVICE_NAME" ] && die_no_help 102 "Dossier de logs introuvable pour $SERVICE_NAME"
     fi
 
     if [ "$MODE" = "playback" ]; then
-        [ ! -f "$LOG_FILE" ] && die 104 "Fichier history.log non trouvé pour rejeu"
+        [ ! -f "$LOG_FILE" ] && die_no_help 104 "Fichier history.log non trouvé pour rejeu"
     fi
 }
 
