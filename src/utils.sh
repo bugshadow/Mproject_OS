@@ -18,29 +18,27 @@ log_event() {
     local user_name=${SUDO_USER:-$USER}
     local line="${ts} : ${user_name:-unknown} : ${type} : ${msg}"
 
-    # Affichage coloré sur le terminal
-    case "$type" in
-        "INFOS")  echo -e "${C_GREEN}[✓] ${msg}${C_RESET}" ;;
-        "ERROR")  echo -e "${C_RED}[✗] ${msg}${C_RESET}" >&2 ;;
-        "WARN")   echo -e "${C_YELLOW}[!] ${msg}${C_RESET}" ;;
-        "DANGER") echo -e "\n${C_BRED}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n┃   ALERTE DANGER : ${msg}\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${C_RESET}\n" >&2 ;;
-        "CMD") 
-            [ "$FLAG_VERBOSE" = true ] && echo -e "${C_BLUE}╭──[  Commande ]─────────────────────────────────────────${C_RESET}\n${C_BLUE}│${C_RESET} ${C_CYAN}${msg}${C_RESET}" 
-            ;;
-        "RET")
-            local ret_color="${C_GREEN}Succès"
-            [ "$msg" != "0" ] && ret_color="${C_RED}Erreur"
-            [ "$FLAG_VERBOSE" = true ] && echo -e "${C_BLUE}│${C_RESET} ↳ Résultat : ${ret_color} (Code ${msg})${C_RESET}"
-            ;;
-        "SNAP")
-            local pretty_snap=$(echo "$msg" | sed -e 's/CPU=/\x1b[33mCPU:\x1b[0m /' -e 's/MEM=/\x1b[33mRAM:\x1b[0m /' -e 's/DISK=/\x1b[33mDisque:\x1b[0m /' -e 's/TOP5=/\n\x1b[34m│\x1b[0m ↳ \x1b[33mTop 5 Processus:\x1b[0m /')
-            [ "$FLAG_VERBOSE" = true ] && echo -e "${C_BLUE}│${C_RESET}  Paramètres : ${pretty_snap}\n${C_BLUE}╰──────────────────────────────────────────────────────────${C_RESET}"
-            ;;
-        "CORR")
-            [ "$FLAG_VERBOSE" = true ] && echo -e "${C_BRED}╭──[  CORRÉLATION DÉTECTÉE ]─────────────────────────────${C_RESET}\n${C_BRED}│${C_RESET} ${C_YELLOW}${msg}${C_RESET}\n${C_BRED}╰──────────────────────────────────────────────────────────${C_RESET}"
-            ;;
-        *) echo "$line" ;;
-    esac
+    # Affichage coloré sur le terminal si FLAG_NO_STDOUT n'est pas "true"
+    if [ "$FLAG_NO_STDOUT" != "true" ] && [ "$type" != "SNAP" ] && { [ "$type" != "CMD" ] || [ "$FLAG_VERBOSE" = true ]; }; then
+        case "$type" in
+            "INFOS")  echo -e "${C_GREEN}[✓] ${msg}${C_RESET}" ;;
+            "ERROR")  echo -e "${C_RED}[✗] ${msg}${C_RESET}" >&2 ;;
+            "WARN")   echo -e "${C_YELLOW}[!] ${msg}${C_RESET}" ;;
+            "DANGER") echo -e "\n${C_BRED}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n┃   ALERTE DANGER : ${msg}\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${C_RESET}\n" >&2 ;;
+            "CMD") 
+                [ "$FLAG_VERBOSE" = true ] && echo -e "${C_BLUE}╭──[  Commande ]─────────────────────────────────────────${C_RESET}\n${C_BLUE}│${C_RESET} ${C_CYAN}${msg}${C_RESET}" 
+                ;;
+            "RET")
+                local ret_color="${C_GREEN}Succès"
+                [ "$msg" != "0" ] && ret_color="${C_RED}Erreur"
+                [ "$FLAG_VERBOSE" = true ] && echo -e "${C_BLUE}│${C_RESET} ↳ Résultat : ${ret_color} (Code ${msg})${C_RESET}"
+                ;;
+            "CORR")
+                [ "$FLAG_VERBOSE" = true ] && echo -e "${C_BRED}╭──[  CORRÉLATION DÉTECTÉE ]─────────────────────────────${C_RESET}\n${C_BRED}│${C_RESET} ${C_YELLOW}${msg}${C_RESET}\n${C_BRED}╰──────────────────────────────────────────────────────────${C_RESET}"
+                ;;
+            *) echo "$line" ;;
+        esac
+    fi
 
     # Écriture atomique dans le fichie
     if [ -n "$LOG_FILE" ] && [ -d "$(dirname "$LOG_FILE")" ]; then
