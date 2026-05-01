@@ -203,14 +203,14 @@ _playback_compress_log() {
 
     local ts
     ts=$(date "+%Y-%m-%d_%H-%M-%S")
-    local archive_name="${ts}_playback_history.gz"
+    local archive_name="${ts}_playback_history.tar.gz"
     local output_path="${ARCHIVE_DIR}/${archive_name}"
 
     mkdir -p "$ARCHIVE_DIR"
 
     log_event "INFOS" "Compression multithread de $LOG_FILE → $output_path"
 
-    if "$helper" "$LOG_FILE" "$output_path" 4; then
+    if "$helper" -j 4 "$output_path" "$LOG_FILE"; then
         local size
         size=$(du -h "$output_path" 2>/dev/null | awk '{print $1}')
         log_event "INFOS" "Archive compressée créée : $output_path ($size)"
