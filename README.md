@@ -86,17 +86,27 @@ make
 ./tests/generate_test_logs.sh
 ```
 
-### Étape 2 : Vérification de l'Interface et la Gestion d'Erreur (Code 100/101)
-Le script doit rejeter les mauvaises manipulations :
+### Étape 2 : Vérification de l'Interface et la Gestion d'Erreur (Codes 100 à 104)
+Le script doit rejeter les mauvaises manipulations et afficher l'aide AVANT d'afficher la grosse boîte d'erreur rouge :
 ```bash
 # Vérifier l'aide détaillée classique
 ./blackbox -h
 
-# Vérifier l'erreur "Service manquant" (Code 101)
-./blackbox -w
-
-# Vérifier l'erreur "Option inconnue" (Code 100)
+# Tester une option inconnue :
 ./blackbox --unknown
+# 👉 Affichera l'aide, puis la grosse box "❌ ERREUR 100 : Option inconnue"
+
+# Tester le service manquant :
+./blackbox -w
+# 👉 Affichera l'aide, puis la grosse box "❌ ERREUR 101 : Paramètre obligatoire manquant"
+
+# Tester les droits super-admin/permission :
+./blackbox -w sshd
+# 👉 Affichera l'aide, puis la grosse box "❌ ERREUR 103 : Permission refusée. [...] Utilisez sudo"
+
+# Tester le dossier log manquant :
+./blackbox -a servicenontrouve
+# 👉 Affichera l'aide, puis la grosse box "❌ ERREUR 102 : Répertoire source introuvable [...]"
 ```
 
 ### Étape 3 : Preuve de la Boîte Noire et Multi-Utilisateurs (Mode Watch: -w -s)

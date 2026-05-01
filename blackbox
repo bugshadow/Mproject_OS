@@ -33,11 +33,23 @@ source ./src/mode_watch.sh
 source ./src/mode_analyze.sh
 source ./src/mode_playback.sh
 
-# ── Fonction pour quitter sans afficher l'aide ──
-die_no_help() {
+# ── Fonction centralisée de gestion d'erreur (avec affichage de la doc) ──
+die() {
     local code="$1"
     local msg="$2"
-    echo -e "${C_RED}[✗] ${msg}${C_RESET}" >&2
+    
+    # 1. On avertit silencieusement dans le log si possible
+    log_event "ERROR" "CODE $code : $msg" 2>/dev/null
+    
+    # 2. Exigence du prof : "afficher un message d'aide explicatif contenant la doc"
+    display_help
+    
+    # 3. Solution pour le terminal : L'erreur se perdait tout en haut du manuel. 
+    # On la réaffiche donc en GRAS et en ROUGE TOUT EN BAS du terminal !
+    echo -e "\n${C_BRED}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${C_RESET}" >&2
+    echo -e "${C_BRED}┃ ❌ ERREUR ${code} : ${msg}${C_RESET}" >&2
+    echo -e "${C_BRED}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${C_RESET}\n" >&2
+    
     exit "$code"
 }
 
@@ -83,7 +95,7 @@ init_environment() {
 validate() {
     [ "$MODE" = "restore" ] && return
     
-    [ -z "$SERVICE_NAME" ] && die_no_help 101 "Service name manquant. Usage: blackbox [OPTIONS] <SERVICE_NAME>"
+    [ -z "$SERVICE_NAME" ] && die 101 "Paramètre obligatoire manquant. Usage: blackbox [OPTIONS] <SERVICE_NAME>"
     
     if [ "$MODE" = "analyze" ] || [ "$MODE" = "watch" ]; then
         local log_path="/var/log/$SERVICE_NAME"
@@ -92,20 +104,20 @@ validate() {
         fi
         
         # Test silencieux pour vérifier si on a les droits grâce à l'échec de la création du dossier/fichier plus haut
-        if [ ! -w "$LOG_FILE" ] && [ ! -d "$LOG_DIR" ]; then
-             die_no_help 103 "Permission refusée. Vous n'avez pas le droit d'écrire dans /var/log/blackbox.\nSolution: Utilisez 'sudo' ou utilisez un dossier local avec l'option '-l ./var_local/log'"
+        if [ ! -w "$LOG_FILE" ] || [ ! -d "$LOG_DIR" ]; then
+             die 103 "Permission refusée. Vous n'avez pas le droit d'écrire dans /var/log/blackbox.\n┃ Solution: Utilisez 'sudo' ou utilisez un dossier local avec l'option '-l ./var_local/log'"
         fi
 
-        [ ! -d "$log_path" ] && [ ! -d "/var/log/$SERVICE_NAME" ] && die_no_help 102 "Dossier de logs introuvable pour $SERVICE_NAME"
+        [ ! -d "$log_path" ] && [ ! -d "/var/log/$SERVICE_NAME" ] && die 102 "Répertoire source (Dossier de logs) introuvable pour le service '$SERVICE_NAME'"
     fi
 
     if [ "$MODE" = "playback" ]; then
-        [ ! -f "$LOG_FILE" ] && die_no_help 104 "Fichier history.log non trouvé pour rejeu"
+        [ ! -f "$LOG_FILE" ] && die 104 "Fichier history.log introuvable pour rejeu (mode -p)"
     fi
 }
 
 mode_restore() { 
-    [ "$(id -u)" != "0" ] && die 103 "Privilèges root requis pour -r"
+    [ "$(id -u)" != "0" ] && die 103 "Tentative d'action critique (restore) sans les droits administrateur (root). Utilisez sudo !"
     rm -rf "$LOG_DIR"
     log_event "INFOS" "Environnement réinitialisé avec succès"
     exit 0
@@ -119,7 +131,7 @@ run_mode() {
         analyze)  analyze_main "$SERVICE_NAME" ;;
         playback) playback_main "$SERVICE_NAME" "$PLAYBACK_DATE" ;;
         restore)  mode_restore ;;
-        *) die 100 "Aucun mode principal spécifié (-w, -a, -p, -r)" ;;
+        *) die 100 "Aucun mode principal spécifié (-w, -a, -p, -r) ou option entrée inconnu" ;;
     esac
 }
 
