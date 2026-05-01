@@ -40,8 +40,11 @@ log_event() {
         esac
     fi
 
-    # Écriture atomique dans le fichie
+    # Écriture atomique dans le fichier
     if [ -n "$LOG_FILE" ] && [ -d "$(dirname "$LOG_FILE")" ]; then
+        # On s'assure que le fichier existe avant d'écrire (si le répertoire est accessible)
+        [ ! -f "$LOG_FILE" ] && touch "$LOG_FILE" 2>/dev/null
+        
         (
             flock -w 2 200
             echo -e "${line}" >> "$LOG_FILE"

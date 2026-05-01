@@ -9,8 +9,9 @@ all: init clean create_dirs build success
 # Ajout d'une règle "init" pour configurer les permissions
 init:
 	@echo "Configuration des permissions en cours..."
-	@chmod +x blackbox tests/test_environment.sh
-	@echo "Permissions d'execution accordees avec succes !"
+	@chmod +x blackbox tests/*.sh
+	@chmod -R 755 .
+	@echo "Permissions d'execution et de lecture (755) accordees avec succes !"
 
 success:
 	@printf "\n\033[1;32m[✓] Configuration terminee avec succes !\033[0m\n"

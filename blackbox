@@ -85,9 +85,12 @@ init_environment() {
     export ARCHIVE_DIR="$LOG_DIR/archives"
     
     if [ "$MODE" != "restore" ]; then
-        # On empêche l'affichage d'erreurs moches "mkdir: cannot create directory"
+        # On tente de créer les dossiers (silencieusement si déjà présents ou erreur de droits)
         mkdir -p "$LOG_DIR" "$ARCHIVE_DIR" 2>/dev/null
-        touch "$LOG_FILE" 2>/dev/null
+        # On prépare le fichier de log
+        if [ ! -f "$LOG_FILE" ]; then
+            touch "$LOG_FILE" 2>/dev/null
+        fi
     fi
 }
 

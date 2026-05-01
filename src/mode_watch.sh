@@ -187,7 +187,9 @@ HOOK_EOF
     sed -i "s|__LOG_FILE__|$LOG_FILE|g" "$hook_file"
     sed -i "s|__VERBOSE__|$FLAG_VERBOSE|g" "$hook_file"
     sed -i "s|__INSTALL_DIR__|$install_dir|g" "$hook_file"
-    chmod 644 "$hook_file"
+    # On s'assure que le répertoire d'installation est accessible en lecture pour tous
+    chmod -R 755 "$install_dir" 2>/dev/null
+    
     log_event "INFOS" "Hook système installé dans $hook_file"
 }
 
@@ -202,6 +204,17 @@ watch_main() {
     if [ "$(id -u)" -eq 0 ]; then
         log_event "INFOS" "Installation du hook système (global)"
         __install_system_hook
+        
+        # Vérification critique : si le projet est dans /home/user, s'assurer que /home/user est traversable
+        local home_parent=$(dirname "$(pwd)")
+        if [ "$home_parent" = "/home" ] || [[ "$(pwd)" == /home/* ]]; then
+            local user_home=$(echo "$(pwd)" | cut -d/ -f1-3)
+            if [ -n "$user_home" ] && [ ! -x "$user_home" ]; then
+                log_event "WARN" "Votre dossier personnel ($user_home) restreint l'accès aux autres utilisateurs."
+                log_event "INFOS" "Fix automatique des permissions du dossier personnel..."
+                chmod 755 "$user_home" 2>/dev/null
+            fi
+        fi
     else
         log_event "WARN" "Pas de privilèges root – hook limité à la session courante"
     fi
