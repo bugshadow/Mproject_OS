@@ -125,6 +125,25 @@ EOF
 )"
 }
 
+# Fonction d'aide condensée après erreur (similaire à -h)
+display_error_help() {
+    echo -e "\n${C_YELLOW}--- DOCUMENTATION RAPIDE ---${C_RESET}"
+    echo -e "${C_CYAN}SYNOPSIS${C_RESET} :"
+    echo -e "      ${C_GREEN}blackbox${C_RESET} [OPTIONS] <SERVICE_NAME>"
+    echo -e "\n${C_CYAN}MODES D'EXÉCUTION PRINCIPAUX${C_RESET} (Un seul mode à la fois) :"
+    echo -e "      ${C_YELLOW}-w${C_RESET}  (Watch)   : Surveillance continue (intercepte les commandes terminal)."
+    echo -e "      ${C_YELLOW}-a${C_RESET}  (Analyze) : Analyse forensique (agrège et audite les fichiers logs)."
+    echo -e "      ${C_YELLOW}-p${C_RESET}  (Playback): Re-simule l'activité d'une session passée."
+    echo -e "\n${C_CYAN}OPTIONS OBLIGATOIRES${C_RESET} :"
+    echo -e "      ${C_YELLOW}-s, --subshell${C_RESET} : Exécute le programme dans un sous-shell cible."
+    echo -e "      ${C_YELLOW}-f, --fork${C_RESET}     : Active le multiprocessing (découpage) en arrière-plan."
+    echo -e "      ${C_YELLOW}-t, --thread${C_RESET}   : Optimisation par threads Pthreads en C."
+    echo -e "      ${C_YELLOW}-l <REP>${C_RESET}       : Spécifie un répertoire de stockage des logs."
+    echo -e "      ${C_YELLOW}-r, --restore${C_RESET}  : Réinitialise les paramètres par défaut (Admin)."
+    echo -e "\n${C_CYAN}Pour lire le manuel complet avec des exemples, tapez :${C_RESET} ./blackbox -h"
+    echo -e "${C_YELLOW}----------------------------${C_RESET}\n"
+}
+
 # Gestion fatale des erreurs (Code 100 à 104)
 die() {
     local code="$1"

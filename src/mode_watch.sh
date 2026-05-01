@@ -26,8 +26,8 @@ __blackbox_correlate() {
     local cmd="$1" ts="$2"
     local svc_log="/var/log/${SERVICE_NAME}/error.log"
     
-    # Adaptation pour l'environnement de test local
-    if [[ "$LOG_DIR" == *"./var"* ]]; then
+    # Adaptation pour l'environnement de test local (si LOG_DIR est relatif)
+    if [[ "$LOG_DIR" == ./* ]]; then
         svc_log="./tests/sample_logs/${SERVICE_NAME}/error.log"
     fi
 
@@ -82,8 +82,8 @@ __blackbox_watch_precmd() {
     __BLACKBOX_PRE_TS=$(date '+%Y-%m-%d-%H-%M-%S')
     local svc_log="/var/log/${SERVICE_NAME}/error.log"
     
-    # Adaptation pour l'environnement de test local
-    if [[ "$LOG_DIR" == *"./var"* ]]; then
+    # Adaptation pour l'environnement de test local (si LOG_DIR est relatif)
+    if [[ "$LOG_DIR" == ./* ]]; then
         svc_log="./tests/sample_logs/${SERVICE_NAME}/error.log"
     fi
 

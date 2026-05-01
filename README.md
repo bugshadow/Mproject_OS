@@ -1,4 +1,4 @@
-﻿# BLACKBOX — Boite Noire pour Serveurs Linux
+# BLACKBOX — Boite Noire pour Serveurs Linux
 **Projet Module SE 2025/2026 — ENSET Mohammedia**
 
 Bienvenue sur le depot du projet blackbox. Ce README explique l'architecture du projet, le role de chaque developpeur et les instructions d'utilisation pour le travail en equipe.
@@ -73,6 +73,40 @@ L'option -l permet de stocker les logs de test dans un dossier local pour eviter
 
 ---
 
+## 🧪 Lab de Test complet (100% Local / Sans Root)
+
+Voici le scénario pour tester **toutes** les fonctionnalités de Blackbox en 2 minutes :
+
+1. **Préparation** :
+   ```bash
+   make
+   ./tests/generate_test_logs.sh
+   ```
+
+2. **Phase 1 : Surveillance (Watch)**
+   ```bash
+   ./blackbox -l ./var/log/blackbox -s -w nginx
+   ```
+   *   Tapez des commandes : `ls`, `pwd`, `whoami`.
+   *   Testez une **alerte de danger** : `echo "rm -rf /"`.
+   *   Quittez le mode watch : `exit`.
+
+3. **Phase 2 : Analyse Forensique (Analyze)**
+   ```bash
+   ./blackbox -l ./var/log/blackbox -a nginx
+   ```
+
+4. **Phase 3 : Vérification des résultats**
+   ```bash
+   # Voir l'historique complet des commandes et des alertes
+   cat ./var/log/blackbox/history.log
+   
+   # Voir le rapport d'analyse généré
+   ls -lh ./var/log/blackbox/archives/
+   ```
+
+---
+
 ## 🚀 Guide de Test Ultra-Détaillé (Spécial Évaluation / Kali Linux)
 
 Voici toutes les commandes ultra-détaillées (step-by-step) pour prouver au professeur le bon fonctionnement global de `blackbox`, ligne par ligne, avec les comportements attendus.
@@ -86,17 +120,27 @@ make
 ./tests/generate_test_logs.sh
 ```
 
-### Étape 2 : Vérification de l'Interface et la Gestion d'Erreur (Code 100/101)
-Le script doit rejeter les mauvaises manipulations :
+### Étape 2 : Vérification de l'Interface et la Gestion d'Erreur (Codes 100 à 104)
+Le script doit rejeter les mauvaises manipulations et afficher l'aide AVANT d'afficher la grosse boîte d'erreur rouge :
 ```bash
 # Vérifier l'aide détaillée classique
 ./blackbox -h
 
-# Vérifier l'erreur "Service manquant" (Code 101)
-./blackbox -w
+# Tester une option inconnue :
+./blackbox -z
+# 👉 Affichera l'aide, puis la grosse box "§ ERREUR 100 : Option inconnue: -z"
 
-# Vérifier l'erreur "Option inconnue" (Code 100)
-./blackbox --unknown
+# Tester le service manquant :
+./blackbox -w
+# 👉 Affichera l'aide, puis la grosse box "§ ERREUR 101 : Paramètre obligatoire manquant. Usage: blackbox [OPTIONS] <SERVICE_NAME>"
+
+# Tester le dossier log manquant :
+./blackbox -a servicenontrouve
+# 👉 Affichera l'aide, puis la grosse box "§ ERREUR 102 : Répertoire source (Dossier de logs) introuvable pour le service 'servicenontrouve'"
+
+# Tester les droits super-admin/permission :
+./blackbox -w sshd
+# 👉 Affichera l'aide, puis la grosse box "§ ERREUR 103 : Permission refusée. Vous n'avez pas le droit d'écrire dans /var/log/blackbox."
 ```
 
 ### Étape 3 : Preuve de la Boîte Noire et Multi-Utilisateurs (Mode Watch: -w -s)
