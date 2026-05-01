@@ -173,7 +173,9 @@ __install_system_hook() {
 export SERVICE_NAME="__SERVICE__"
 export LOG_FILE="__LOG_FILE__"
 export FLAG_VERBOSE="__VERBOSE__"
+export FLAG_NO_STDOUT="true" # Pour éviter que les logs s'affichent partout
 # On recharge les fonctions de blackbox depuis le répertoire d'installation
+source __INSTALL_DIR__/src/utils.sh 2>/dev/null
 source __INSTALL_DIR__/src/mode_watch.sh 2>/dev/null || {
     # Fallback : on définit les fonctions minimales directement
     # (À compléter si le chemin n'est pas standard – ici on suppose que le sourcing a déjà eu lieu)
