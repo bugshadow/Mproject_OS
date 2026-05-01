@@ -41,13 +41,13 @@ die() {
     # 1. On avertit silencieusement dans le log si possible
     log_event "ERROR" "CODE $code : $msg" 2>/dev/null
     
-    # 2. Exigence du prof : "afficher un message d'aide explicatif contenant la doc"
-    display_help
+    # 2. Exigence du prof (section 3.2.3) : documentation explicative ET "similaire"
+    # Nous utilisons display_error_help (condensée sans le grand ASCII) au lieu de display_help
+    display_error_help
     
-    # 3. Solution pour le terminal : L'erreur se perdait tout en haut du manuel. 
-    # On la réaffiche donc en GRAS et en ROUGE TOUT EN BAS du terminal !
+    # 3. Affichage de la boîte d'erreur TOUT EN BAS pour qu'elle reste visible
     echo -e "\n${C_BRED}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${C_RESET}" >&2
-    echo -e "${C_BRED}┃ ❌ ERREUR ${code} : ${msg}${C_RESET}" >&2
+    echo -e "${C_BRED}┃ § ERREUR ${code} : ${msg}${C_RESET}" >&2
     echo -e "${C_BRED}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${C_RESET}\n" >&2
     
     exit "$code"
