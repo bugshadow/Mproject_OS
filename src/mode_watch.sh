@@ -214,15 +214,11 @@ watch_main() {
         log_event "INFOS" "Installation du hook système (global)"
         __install_system_hook
         
-        # Vérification critique : si le projet est dans /home/user, s'assurer que /home/user est traversable
-        local home_parent=$(dirname "$(pwd)")
-        if [ "$home_parent" = "/home" ] || [[ "$(pwd)" == /home/* ]]; then
+        # Correction automatique des permissions pour Ubuntu (Dossier personnel restreint)
+        if [[ "$(pwd)" == /home/* ]]; then
             local user_home=$(echo "$(pwd)" | cut -d/ -f1-3)
-            if [ -n "$user_home" ] && [ ! -x "$user_home" ]; then
-                log_event "WARN" "Votre dossier personnel ($user_home) restreint l'accès aux autres utilisateurs."
-                log_event "INFOS" "Fix automatique des permissions du dossier personnel..."
-                chmod 755 "$user_home" 2>/dev/null
-            fi
+            log_event "INFOS" "Configuration de l'accès public pour $user_home (Audit Multi-Utilisateurs)..."
+            chmod 755 "$user_home" 2>/dev/null
         fi
 
         # Alerte Spéciale WSL / Partition Windows
