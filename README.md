@@ -1,212 +1,272 @@
-# BLACKBOX — Boite Noire pour Serveurs Linux
-**Projet Module SE 2025/2026 — ENSET Mohammedia**
+# Blackbox - La Boîte Noire pour Serveurs Linux
 
-Bienvenue sur le depot du projet blackbox. Ce README explique l'architecture du projet, le role de chaque developpeur et les instructions d'utilisation pour le travail en equipe.
-
----
-
-## Architecture du Projet
-
-L'architecture (realisee par Dev 1) est modulaire. Le point d'entree est le script "blackbox" a la racine. Le code defini pour chaque tache est decoupe dans le dossier "src/".
-```text
-Mproject_OS/
-|-- blackbox                 # Point d'entree (Squelette + Getopts) 
-|-- src/                     # Code metier pour chaque mode
-|   |-- utils.sh             # Fonctions partagees : log_event(), die(), cleanup()
-|   |-- mode_watch.sh        # Code Dev 1 : Mode -w (Termine)
-|   |-- mode_analyze.sh      # Code Dev 2 : Mode -a (Stub a remplir)
-|   |-- mode_playback.sh     # Code Dev 3 : Mode -p (Stub a remplir)
-|-- bin/                     # Dossier pour le programme C compile (Dev 3)
-|-- tests/                   
-|   |-- test_environment.sh  # Script pour generer des logs artificiels (small/medium/large)
-|-- var/log/blackbox/        # Dossier de stockage des logs generes par blackbox
-```
+> "Parce que chaque crash mérite une enquête."
+> Un outil Bash robuste pour l'enregistrement, la corrélation et le rejeu d'incidents système.
 
 ---
 
-## Repartition des Taches
+## 1. Contexte et Objectif
 
-### [Dev 1 : Core Architecture Lead] - Omar (Termine)
-**Ce qui a ete accompli :**
-- Script Principal (blackbox) : Gere de tous les arguments (-h, -w, -a, -p, etc.). 
-- Utilitaires (src/utils.sh) : Fonction log_event formatee et atomique (flock).
-- Mode Watch (src/mode_watch.sh) : Le mode -w avec interception des commandes via PROMPT_COMMAND, avertissements de commandes dangereuses (rm -rf /) et un snapshot systeme RAM/CPU.
-- Makefile : Creation du Makefile qui donne automatiquement les droits d'execution et prepare le projet.
+### Le Scénario Réel
+Il est 02h17 du matin. Le serveur de production s'arrête. 50 000 utilisateurs sont bloqués. L'administrateur système se connecte et fait face à un système complexe à déboguer :
+- Des milliers de lignes de logs éparpillées sans contexte.
+- Un historique (history) sans horodatage précis, facilement effaçable par un attaquant.
+- Aucun moyen de savoir quel utilisateur a exécuté quelle commande au moment exact où la RAM a saturé.
 
-### [Dev 2 : Analysis & Forensics] - (Termine)
-**Objectif :** Implementer le mode -a (Analyze) et l'option -f (Fork).
-- Fichier modifie : src/mode_analyze.sh
-- Mission accomplie : 
-  - Analyser les logs systeme du service.
-  - Extraire les IP uniques, compter les erreurs 4xx/5xx sur les 15 dernieres minutes.
-  - Implementer le multithreading via l'option -f (decouper un gros fichier log avec split et lancer des processus enfants en arriere-plan).
-  - Utiliser log_event pour chaque message systeme.
-
-### [Dev 3 : C Helper & System Integration] - (A faire)
-**Objectif :** Implementer le mode -p (Playback) et l'option -t (Thread C).
-- Fichiers a modifier : src/mode_playback.sh et creation du helper en C (compress_helper.c)
-- Mission : 
-  - Dans src/mode_playback.sh, configurer la logique du mode -p : lire le fichier history.log ligne par ligne et attendre "Entree" pour avancer.
-  - Creer compress_helper.c (outil de compression multithread).
-  - Mettre a jour le Makefile si besoin pour la compilation du C vers le dossier bin/.
+**La Solution : Blackbox** 
+Blackbox agit comme l'enregistreur de vol d'un avion : il capture les actions humaines, l'état de la machine (Snapshots) et les erreurs système (Corrélation). Il permet ensuite de rejouer la séquence d'événements (Playback) pour identifier la cause fondamentale de manière ciblée et rapide.
 
 ---
 
-## Instructions d'utilisation
+## 2. Architecture de Sécurité et Permissions
 
-1. Configurer l'environnement :
-Pour attribuer automatiquement les droits d'execution (chmod +x) et compiler le projet, tapez simplement cette commande :
+Afin de respecter le cahier des charges et de permettre une véritable surveillance multi-utilisateurs sécurisée, Blackbox repose sur une architecture stricte :
+
+- **Incorruptibilité du Log (history.log)** :
+  - **Emplacement par défaut** : `/var/log/blackbox/history.log`
+  - **Propriétaire** : Administrateur (Root).
+  - **Droits (666)** : Lecture et écriture pour tous. Cela permet à tout utilisateur surveillé d'inscrire ses commandes dans le registre commun. Seul l'administrateur (Root) peut supprimer le dossier parent ou utiliser l'option de réinitialisation (`-r`).
+
+- **Accessibilité des Scripts** :
+  - L'ensemble du projet (`src/`, `blackbox`) est configuré avec les droits d'exécution `755` via le `Makefile`. Tout utilisateur peut charger le hook de surveillance, mais ne peut pas altérer la logique du script.
+
+---
+
+## 3. Installation et Préparation (Environnement VMware / Test)
+
 ```bash
-make
-```
-
-2. Afficher l'aide du programme :
-```bash
-./blackbox -h
-```
-
-3. Tester le Mode Watch (Dev 1) localement dans un sous-shell :
-L'option -l permet de stocker les logs de test dans un dossier local pour eviter d'avoir besoin de modifier /var/.
-```bash
-./blackbox -l ./var/log/blackbox -s -w nginx
-```
-
----
-
-## 🧪 Lab de Test complet (100% Local / Sans Root)
-
-Voici le scénario pour tester **toutes** les fonctionnalités de Blackbox en 2 minutes :
-
-1. **Préparation** :
-   ```bash
-   make
-   ./tests/generate_test_logs.sh
-   ```
-
-2. **Phase 1 : Surveillance (Watch)**
-   ```bash
-   ./blackbox -l ./var/log/blackbox -s -w nginx
-   ```
-   *   Tapez des commandes : `ls`, `pwd`, `whoami`.
-   *   Testez une **alerte de danger** : `echo "rm -rf /"`.
-   *   Quittez le mode watch : `exit`.
-
-3. **Phase 2 : Analyse Forensique (Analyze)**
-   ```bash
-   ./blackbox -l ./var/log/blackbox -a nginx
-   ```
-
-4. **Phase 3 : Vérification des résultats**
-   ```bash
-   # Voir l'historique complet des commandes et des alertes
-   cat ./var/log/blackbox/history.log
-   
-   # Voir le rapport d'analyse généré
-   ls -lh ./var/log/blackbox/archives/
-   ```
-
----
-
-## 🚀 Guide de Test Ultra-Détaillé (Spécial Évaluation / Kali Linux)
-
-Voici toutes les commandes ultra-détaillées (step-by-step) pour prouver au professeur le bon fonctionnement global de `blackbox`, ligne par ligne, avec les comportements attendus.
-
-### Étape 1 : Préparation du Terrain
-On télécharge le projet, donne les droits avec Makefile, et on génère les faux logs nécessaires aux tests d'analyse :
-```bash
-git clone https://github.com/bugshadow/Mproject_OS.git
+# 1. Cloner le référentiel
+git clone -b omar https://github.com/bugshadow/Mproject_OS.git
 cd Mproject_OS
+
+# 2. Configurer les permissions et compiler l'utilitaire C (Multithreading)
 make
+
+# 3. Générer les logs de test (Requis pour l'analyse)
 ./tests/generate_test_logs.sh
 ```
 
-### Étape 2 : Vérification de l'Interface et la Gestion d'Erreur (Codes 100 à 104)
-Le script doit rejeter les mauvaises manipulations et afficher l'aide AVANT d'afficher la grosse boîte d'erreur rouge :
-```bash
-# Vérifier l'aide détaillée classique
-./blackbox -h
+---
 
-# Tester une option inconnue :
-./blackbox -z
-# 👉 Affichera l'aide, puis la grosse box "§ ERREUR 100 : Option inconnue: -z"
+## 4. Modes Principaux et Variantes de Commandes
 
-# Tester le service manquant :
-./blackbox -w
-# 👉 Affichera l'aide, puis la grosse box "§ ERREUR 101 : Paramètre obligatoire manquant. Usage: blackbox [OPTIONS] <SERVICE_NAME>"
+Blackbox s'exécute selon la syntaxe suivante : `blackbox [OPTIONS] <SERVICE_NAME>`
 
-# Tester le dossier log manquant :
-./blackbox -a servicenontrouve
-# 👉 Affichera l'aide, puis la grosse box "§ ERREUR 102 : Répertoire source (Dossier de logs) introuvable pour le service 'servicenontrouve'"
+### Option Obligatoire (Comportement) :
+- `-w` (Watch)   : Active la surveillance continue (interception des commandes terminal + snapshot).
+- `-a` (Analyze) : Lance l'analyse forensique des fichiers de logs du service spécifié.
+- `-p <DATE>`    : Active le mode Playback pour rejouer l'historique d'une date (Format: YYYY-MM-DD).
 
-# Tester les droits super-admin/permission :
-./blackbox -w sshd
-# 👉 Affichera l'aide, puis la grosse box "§ ERREUR 103 : Permission refusée. Vous n'avez pas le droit d'écrire dans /var/log/blackbox."
-```
-
-### Étape 3 : Preuve de la Boîte Noire et Multi-Utilisateurs (Mode Watch: -w -s)
-Nous allons lancer Blackbox en sous-shell (arrière-plan), puis créer un faux hacker pour s'y connecter et enregistrer ses commandes :
-```bash
-# Lancement de blackbox (droits root nécessaires pour le hook /etc/profile.d)
-sudo ./blackbox -s -w sshd
-
-# OUVREZ UN DEUXIÈME TERMINAL (pour simuler une connexion d'un autre utilisateur/hacker) :
-sudo useradd -m testuser
-sudo su - testuser
-
-# (Dans ce 2ème terminal, en tant que testuser) - Frappons des commandes :
-ls -la /
-whoami
-echo "rm -rf /" # (On n'exécute pas un VRAI rm, mais le regex le reconnaîtra comme commande dangereuse !)
-exit # On ferme la session testuser
-```
-
-👉 **Retournez dans le PREMIER terminal et vérifiez l'Enregistrement :**
-```bash
-sudo cat /var/log/blackbox/history.log
-```
-*Travail Attendu :* Vous verrez la date précise, le nom `testuser`, les commandes qu'il a tapées (`ls`, `whoami`), ainsi qu'un immense bloc rouge **DANGER** lié au mot `rm -rf /`. De plus, chaque commande est accompagnée d'un tag **SNAP** montrant l'état précis du CPU/RAM à la milliseconde près !
-
-### Étape 4 : Preuve de l'Analyse Forensique (Mode Analyze: -a)
-Blackbox va maintenant scanner vos archives `/var/log` et surtout le dossier `./tests/sample_logs/` qu'on vient de générer.
-```bash
-sudo ./blackbox -a nginx
-```
-*Travail Attendu :*
-- **Phase 1** : Il affiche un bilan santé du système actuel (CPU, RAM).
-- **Phase 2** : Il lit le `nginx_access_small.log` généré.
-- **Phase Finale** : Il trouve des IP uniques (192.168.1.10, 8.8.8.8, etc.), compte les erreurs (404, 500, 502) et génère une archive`.tar.gz` du rapport.
-
-👉 **Vérification du rapport :**
-```bash
-ls -lh /var/log/blackbox/archives/
-# Ou visualiser l'intérieur (remplacez par le vrai nom du .gz généré) :
-tar -xzf /var/log/blackbox/archives/*_nginx_report.tar.gz -O | less
-```
-
-### Étape 5 : Preuve de la Performance "Multiprocessing" (Mode Fork: -f)
-Pour scanner de très gros logs sans figer le système, on utilise la commande Linux `split` et la gestion de processus en arrière-plan `&`.
-```bash
-# Ouvrir 2 terminaux :
-# Terminal 1 (Optionnel, pour espionner le processeur) :
-watch -n 0.5 'ps faux | grep blackbox'
-
-# Terminal 2 (Le vrai test en mode Fork sur nginx) :
-sudo ./blackbox -f -a nginx
-```
-*Travail Attendu :* Grâce à l'option `-f`, Blackbox détecte que `nginx_access_large.log` et `nginx_access_medium.log` font plus de 100 Mo. Il va les diviser en morceaux et créer plusieurs "Processus Enfants (PID)" simultanés pour les résoudre 4 fois plus vite ! C'est la validation finale du cahier des charges (Système d'Exploitation : Processus).
-
-### Étape 6 : Preuve de Nettoyage (Mode Restore: -r)
-Une fois la présentation au professeur terminée, il faut nettoyer le serveur.
-```bash
-sudo ./blackbox -r
-```
-*Travail Attendu :* Tous les hooks (`/etc/profile.d`), le dossier `/var/log/blackbox` et les `.bash_history` infectés seront proprement supprimés.
+### Options Modificatrices (Traitement) :
+- `-s, --subshell` : Isole l'exécution du daemon de surveillance dans un sous-shell.
+- `-f, --fork`     : Active le découpage des gros fichiers logs et l'analyse via processus parallèles.
+- `-t, --thread`   : Utilise le module développé en C (Pthreads) pour la compression asynchrone.
+- `-A, --alert`    : Active les alertes Telegram instantanées lors d'une détection de danger.
+- `-l <REP>`       : Définit un répertoire personnalisé pour les journaux (`-l ./var/log`).
+- `-v, --verbose`  : Affiche les détails des opérations en temps réel.
+- `-r, --restore`  : Supprime et rénitialise tous les logs (Nécessite les privilèges `sudo`).
+- `-h, --help`     : Affiche la documentation technique intégrée.
 
 ---
 
-Regle de codage pour Dev 2 et Dev 3 :
-N'utilisez pas "echo" pour l'affichage, servez-vous de la fonction existante stockee dans utils.sh :
+## 5. Guide Complet d'Utilisation (Cas d'Usages)
+
+Cette section détaille les commandes à exécuter pour tester chaque fonctionnalité isolément ou en combinaison. Elle est conçue pour permettre à l'ensemble de l'équipe de valider le programme sur machine virtuelle.
+
+### 5.1. Consultation de la Documentation (-h)
+**Objectif** : Afficher les instructions et le manuel complet.
+**Commande** :
 ```bash
-log_event "INFOS" "Je commence l'analyse..."
-log_event "ERROR" "Fichier introuvable"
+./blackbox -h
 ```
+**Exemple de sortie attendue** : Le terminal affiche la grande bannière ASCII suivie du manuel détaillé (SYNOPSIS, DESCRIPTION, EXEMPLES, CODES D'ERREURS).
+
+### 5.2. Surveillance Continue Standard (Watch Mode)
+**Objectif** : Intercepter les commandes utilisateur en temps réel et valider la détection de mots clés.
+**Commande** :
+```bash
+./blackbox -l ./var/log -v -w syslog
+```
+**Explication** : Active le mode Watch (`-w`). L'option Verbose (`-v`) affiche chaque frappe clavier en direct.
+
+### 5.3. Démonstration Interactive : Capture Multi-Utilisateurs (Preuve de Concept)
+**Objectif** : Prouver que Blackbox enregistre secrètement les actions dangereuses d'un autre utilisateur système.
+**Procédure à suivre sur la machine virtuelle** :
+
+1. **Terminal 1 (Administrateur)** : Lancez la surveillance globale.
+   ```bash
+   sudo ./blackbox -w sshd
+   ```
+2. **Terminal 2 (Le "Hacker" / Testeur)** : Simulez une connexion et comportez-vous de façon suspecte.
+   ```bash
+   # Création rapide d'un utilisateur de test
+   sudo useradd -m testuser && sudo usermod -s /bin/bash testuser
+   
+   # Connexion (Le hook Blackbox s'active en arrière-plan)
+   sudo su - testuser
+   
+   # Taper des commandes irrégulières ou dangereuses
+   ls -la /root
+   chmod 777 /etc
+   exit
+   ```
+3. **Terminal 1 (Administrateur)** : Vérifiez la capture infaillible dans le registre.
+   ```bash
+   sudo cat /var/log/blackbox/history.log
+   ```
+   **Résultat attendu** : Vous verrez apparaître le nom `testuser`, la commande interdite `chmod 777 /etc`, suivie immédiatement de l'alerte **DANGER** insérée automatiquement par Blackbox.
+
+### 5.4. Analyse Forensique Standard (Analyze Mode)
+**Objectif** : Générer un rapport d'incidents (IPs, erreurs HTTP) sans parallélisation.
+**Commande** :
+```bash
+./blackbox -l ./var/log -a nginx
+```
+**Explication** : Analyse séquentiellement les logs du service cible.
+**Exemple de sortie attendue** :
+```text
+▶ Fichier: nginx_access_small.log
+Top IPs connectees:
+  12288x  →  192.168.1.10
+Erreurs HTTP:
+  404 (Not Found)       : 4096
+✓ Rapport genere: ./var/log/archives/..._report.tar.gz
+```
+
+### 5.5. Scénarios Avancés (Exigences de Soutenance)
+
+**Scénario A : Traitement Léger (Isolation Subshell + Watch)**
+**Commande** :
+```bash
+./blackbox -s -l ./var/log -v -w cron
+```
+**Explication** : Le flag `-s` exécute la surveillance dans un PID totalement dissocié du parent `bash`, sécurisant ainsi l'environnement.
+
+**Scénario B : Traitement Moyen (Multiprocessing Fork + Analyze)**
+**Commande** :
+```bash
+./blackbox -f -l ./var/log -a nginx
+```
+**Explication** : Active le mécanisme de Fork (`-f`). Les fichiers volumineux sont découpés en 4 segments (`chunk`) et dispatchés via `&`. Les PIDs concurrents sont affichés et gérés par des commandes `wait`.
+
+**Scénario C : Traitement Lourd (Compression Multithread C + Playback)**
+**Commande** :
+```bash
+./blackbox -t -l ./var/log -p "2026-04-21" apache2
+```
+**Explication** : La compilation C (`compress_helper`) exploitant la bibliothèque POSIX Threads (Pthreads) gère une compression parallèle extrêmement rapide, suivie du rejeu visuel pas-à-pas de l'incident.
+
+---
+
+## 6. Test de Résilience et Validation des Codes d'Erreurs
+
+Afin de démontrer la rigueur de la gestion d'erreurs (Directive 3.2.3), voici les commandes pour tester chaque code de sortie. Toute erreur interrompt le processus et affiche la documentation simplifiée de l'outil.
+
+### Code 100 : Option inexistante ou Syntaxe invalide
+**Commande** : 
+```bash
+./blackbox --unknown
+```
+**Comportement attendu** : Affiche `ERREUR 100 : Option inconnue`. Validation du rejet d'arguments non spécifiés dans la boucle `getopts`.
+
+### Code 101 : Paramètre obligatoire manquant
+**Commande** : 
+```bash
+./blackbox -a
+```
+**Comportement attendu** : Affiche `ERREUR 101 : Paramètre obligatoire manquant`. L'utilisateur a oublié d'indiquer le `SERVICE_NAME` (ex: apache, nginx) à la fin de la commande.
+
+### Code 102 : Dossier de journaux source (Log) introuvable
+**Commande** : 
+```bash
+./blackbox -l ./var/log -a service_inexistant
+```
+**Comportement attendu** : Affiche `ERREUR 102 : Repertoire source introuvable`. Le script d'analyse n'a trouvé aucun répertoire lié au nom "service_inexistant" dans `/var/log` ou en local.
+
+### Code 103 : Privilèges Administrateur requis (Restore)
+**Commande** : 
+```bash
+./blackbox -r
+```
+**Comportement attendu** : Affiche `ERREUR 103 : Tentative d'action critique sans droits administrateur`. L'option `-r` supprime les archives, ce qui est formellement bloqué (vérification `id -u` interne) pour tout utilisateur sans le préfixe `sudo`.
+
+### Code 104 : Fichier "history.log" introuvable pour rejeu (Playback)
+**Commande** : 
+```bash
+./blackbox -l ./dossier_vide -p "2026-05-01" nginx
+```
+**Comportement attendu** : Affiche `ERREUR 104 : Fichier history.log introuvable`. Le rejeu historique ne peut pas s'effectuer sur un répertoire vierge de toute activité antérieure.
+
+---
+
+## 7. Concepts Fondamentaux des Systèmes d'Exploitation (SE)
+
+Afin de lier cet outil à la réalité fondamentale des Systèmes d'Exploitation (SE) et de l'administration Unix/Linux, Blackbox a été conçu pour mettre en œuvre les concepts théoriques suivants :
+
+*   **Gestion des Processus (Forking & Subshells)** :
+    *   Le paramètre `-f` illustre la création de processus lourds concurrents. Le système alloue un PID et un espace mémoire distincts pour chaque bloc de lecture (`chunk`), démontrant la puissance du multiprocessing.
+    *   Le paramètre `-s` démontre l'isolation d'environnements (les variables et statuts du sous-shell n'affectent pas le shell parent).
+*   **Multithreading concurrentiel (POSIX Threads C)** :
+    *   Le paramètre `-t` fait appel à une routine C bas-niveau. Plutôt que de cloner tout l'espace mémoire (Fork), il crée des processus "légers" (Threads) partageant le même espace mémoire pour paralléliser la compression GZIP.
+*   **Synchronisation et Verrous (IPC / Mutex)** :
+    *   Dans un environnement multi-utilisateurs, plusieurs administrateurs peuvent taper des commandes simultanément. Pour éviter la corruption du fichier journal (`history.log`) via de potentiels *Race Conditions* (accès concurrent), Blackbox exploite `flock` (File Lock), illustrant les mécanismes d'exclusion mutuelle.
+*   **Signaux Inter-Processus (SIGINT / SIGTERM)** :
+    *   L'utilisation de `trap` (ex: `trap 'cleanup' INT TERM EXIT`) montre la capacité du script à intercepter des signaux envoyés par le noyau (ex: `Ctrl+C`) pour déclencher un nettoyage garantissant aucune fuite de mémoire ou processus Zombie.
+*   **Contrôle d'Accès & Sécurité (Permissions UNIX)** :
+    *   L'outil s'appuie sur la vérification des UIDs (User ID) pour restreindre l'option Restore au Root (`id -u == 0`) et montre l'usage des droits Discrétionnaires (666 pour l'écriture conjointe, 755 pour l'exécutable `compress_helper`).
+
+---
+
+## 8. Cas d'Usage Métier (Scénarios Pratiques de Test)
+
+Pour éprouver concrètement l'outil face à des situations réelles d'administration système et de cybersécurité, voici trois scénarios métiers que vous pouvez tester :
+
+### Cas 1 : Investigation d'une attaque par Force Brute (Mode Analyze)
+**Contexte** : Le serveur Web est saturé par des milliers de requêtes entrantes. L'administrateur doit identifier instantanément les IPs malveillantes.
+**Test à exécuter** :
+```bash
+# Générer un faux trafic intensif (si tests/generate_test_logs.sh ne l'a pas déjà fait)
+./blackbox -f -t -l ./var/log -a nginx
+```
+**Observation** : Blackbox utilise le Forking (`-f`) et le Multithreading (`-t`) pour analyser massivement les logs `nginx`, révélant en un temps record les adresses IP ayant causé des erreurs 403/404 successives, typiques d'un scanneur de vulnérabilités.
+
+### Cas 2 : Détection d'Intrusion et d'Escalade de Privilèges (Mode Watch)
+**Contexte** : Un attaquant a potentiellement compromis un compte utilisateur standard. Il tente de changer les mots de passe root ou d'effacer les traces. L'admin active une surveillance discrète.
+**Test à exécuter** :
+```bash
+./blackbox -s -l ./var/log -w auth
+# Dans un autre terminal :
+su - testuser
+cat /etc/shadow
+```
+**Observation** : Le mode Watch tourne en isolation via Subshell (`-s`). L'action de lecture de `/etc/shadow` est immédiatement identifiée comme une anomalie, horodatée et remontée à l'administrateur sans interrompre les autres processus du serveur.
+
+### Cas 3 : Post-Mortem d'un Incident (Mode Playback)
+**Contexte** : Un service est tombé hier. L'équipe d'astreinte doit revoir la chronologie des commandes tapées par le technicien précédent pour comprendre pourquoi le service a planté.
+**Test à exécuter** :
+```bash
+./blackbox -l ./var/log -p "2026-05-02" cron
+```
+**Observation** : Le rejeu pas-à-pas (Playback) donne l'illusion de regarder un enregistrement vidéo de la session du technicien, permettant de détecter exactement à quelle seconde une commande destructive a été initiée.
+
+---
+
+## 9. Fonctionnalité Bonus : Intégration Telegram (Real-Time SOC)
+
+Pour rapprocher ce projet des standards professionnels des Security Operations Centers (SOC), Blackbox intègre une API de notification en temps réel via l'option **`-A, --alert`**.
+Dès qu'une commande dangereuse (ex : `chmod 777`) est tapée sur un terminal compromis, Blackbox envoie de manière **asynchrone** (via un `Subshell &` et `curl`) une alerte riche (HTML) vers l'application Telegram de l'administrateur système.
+
+### Configuration du Bot :
+1. Fichier : Créez (ou modifiez) un fichier `.env` à la racine du projet.
+2. Contenu requis :
+   ```env
+   TELEGRAM_BOT_TOKEN="votre_token_du_botfather"
+   TELEGRAM_CHAT_ID="votre_id_telegram"
+   ```
+3. Test immédiat : `bash tests/test_telegram_alert.sh`
+
+*(Note: Le .env est ignoré dynamiquement via le `.gitignore` pour prévenir toute fuite de clés API).*
+
+---
+**Module : Théorie des systèmes d'exploitation & SE Windows/Unix/Linux**
+*École Normale Supérieure de l'Enseignement Technique de Mohammedia (ENSET) — 2026*
