@@ -4,13 +4,13 @@
 # MODE PLAYBACK : Rejeu de Session (Rôle de Dev 3)
 # ==============================================================================
 #
-# Variables globales implicites utilisées entre les fonctions _playback_* :
-#   PB_TS   — Timestamp de l'événement courant (format YYYY-MM-DD-HH-MM-SS)
-#   PB_USER — Nom de l'utilisateur ayant exécuté la commande
-#   PB_TYPE — Type d'événement (CMD, RET, SNAP, CORR, DANGER, ERROR, INFOS, WARN)
-#   PB_MSG  — Contenu/message de l'événement
+# Variables globales implicites utilisees entre les fonctions _playback_* :
+#   PB_TS   — Timestamp de l'evenement courant (format YYYY-MM-DD-HH-MM-SS)
+#   PB_USER — Nom de l'utilisateur ayant execute la commande
+#   PB_TYPE — Type d'evenement (CMD, RET, SNAP, CORR, DANGER, ERROR, INFOS, WARN)
+#   PB_MSG  — Contenu/message de l'evenement
 #
-# Ces variables sont positionnées par _playback_parse_line() et lues par
+# Ces variables sont positionnees par _playback_parse_line() et lues par
 # _playback_print_record(), _playback_is_internal_event(), et playback_main().
 # ==============================================================================
 
@@ -68,7 +68,7 @@ _playback_is_internal_event() {
     [ "$PB_TYPE" != "INFOS" ] && return 1
 
     case "$PB_MSG" in
-        "Mode Playback démarré"*|"Playback terminé"*|"blackbox démarré"*"mode: playback"*)
+        "Mode Playback demarre"*|"Playback termine"*|"blackbox demarre"*"mode: playback"*)
             return 0
             ;;
     esac
@@ -78,7 +78,7 @@ _playback_is_internal_event() {
 
 _playback_pause() {
     [ -t 0 ] || return 0
-    printf "%b" "${C_YELLOW}    Appuyez sur Entrée pour avancer...${C_RESET}"
+    printf "%b" "${C_YELLOW}    Appuyez sur Entree pour avancer...${C_RESET}"
     read -r _
     printf "\n"
 }
@@ -143,19 +143,19 @@ playback_main() {
         total=$((total + 1))
     done < "$LOG_FILE"
 
-    log_event "INFOS" "Mode Playback démarré pour $service à partir de : $target_ts"
+    log_event "INFOS" "Mode Playback demarre pour $service a partir de : $target_ts"
 
     if [ "$total" -eq 0 ]; then
-        log_event "WARN" "Aucun événement trouvé dans history.log à partir de $target_ts"
+        log_event "WARN" "Aucun evenement trouve dans history.log a partir de $target_ts"
         return 0
     fi
 
     printf "\n%b╔══════════════════════════════════════════════════════╗%b\n" "$C_CYAN" "$C_RESET"
-    printf "%b║        BLACKBOX — Playback : %-20.20s ║%b\n" "$C_CYAN" "$service" "$C_RESET"
+    printf "║        BLACKBOX — Playback : %-20.20s ║\n" "$service"
     printf "%b╚══════════════════════════════════════════════════════╝%b\n\n" "$C_CYAN" "$C_RESET"
     printf "  Rejeu depuis : %s\n" "$target_ts"
     printf "  Source       : %s\n" "$LOG_FILE"
-    printf "  Événements   : %s\n\n" "$total"
+    printf "  evenements   : %s\n\n" "$total"
 
     while [ "$index" -lt "$total" ]; do
         _playback_parse_line "${playback_lines[$index]}" || {
@@ -163,7 +163,7 @@ playback_main() {
             continue
         }
 
-        printf "%b[Étape %03d]%b %s — utilisateur: %s\n" "$C_GREEN" "$step" "$C_RESET" "$PB_TS" "$PB_USER"
+        printf "%b[etape %03d]%b %s — utilisateur: %s\n" "$C_GREEN" "$step" "$C_RESET" "$PB_TS" "$PB_USER"
         _playback_print_record
         index=$((index + 1))
 
@@ -182,22 +182,22 @@ playback_main() {
         step=$((step + 1))
     done
 
-    log_event "INFOS" "Playback terminé — $total événement(s) rejoué(s)"
+    log_event "INFOS" "Playback termine — $total evenement(s) rejoue(s)"
 
-    # ── Compression via le helper C si -t est activé ──
+    # ── Compression via le helper C si -t est active ──
     if [ "$FLAG_THREAD" = true ]; then
         _playback_compress_log
     fi
 }
 
 # ==============================================================================
-# COMPRESSION DU LOG VIA LE HELPER C MULTITHREADÉ (Option -t)
+# COMPRESSION DU LOG VIA LE HELPER C MULTITHREADe (Option -t)
 # ==============================================================================
 _playback_compress_log() {
     local helper="./bin/compress_helper"
 
     if [ ! -x "$helper" ]; then
-        log_event "WARN" "compress_helper introuvable ou non exécutable. Lancez 'make' d'abord."
+        log_event "WARN" "compress_helper introuvable ou non executable. Lancez 'make' d'abord."
         return 1
     fi
 
@@ -213,10 +213,10 @@ _playback_compress_log() {
     if "$helper" -j 4 "$output_path" "$LOG_FILE"; then
         local size
         size=$(du -h "$output_path" 2>/dev/null | awk '{print $1}')
-        log_event "INFOS" "Archive compressée créée : $output_path ($size)"
-        printf "  %b✓ Archive compressée :%b %s (%s)\n" "$C_GREEN" "$C_RESET" "$output_path" "$size"
+        log_event "INFOS" "Archive compressee creee : $output_path ($size)"
+        printf "  %b✓ Archive compressee :%b %s (%s)\n" "$C_GREEN" "$C_RESET" "$output_path" "$size"
     else
-        log_event "ERROR" "Échec de la compression de $LOG_FILE"
+        log_event "ERROR" "echec de la compression de $LOG_FILE"
         return 1
     fi
 }

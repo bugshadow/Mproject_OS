@@ -1,14 +1,14 @@
-#!/bin/bash
+﻿#!/bin/bash
 # ==============================================================================
 # mode_watch.sh — Module Watch (Dev 1)
-# Boîte noire légère pour serveurs Linux — blackbox
+# Boîte noire legere pour serveurs Linux — blackbox
 # ==============================================================================
-# Ce module est sourcé par le script principal blackbox.
-# Il définit la fonction watch_main(), appelée lors de l'option -w.
+# Ce module est source par le script principal blackbox.
+# Il definit la fonction watch_main(), appelee lors de l'option -w.
 # ==============================================================================
 
 # ------------------------------------------------------------
-# Fonction utilitaire : capture d'un snapshot système
+# Fonction utilitaire : capture d'un snapshot systeme
 # ------------------------------------------------------------
 __blackbox_snapshot() {
     local loadavg cpu_mem disk topproc
@@ -20,7 +20,7 @@ __blackbox_snapshot() {
 }
 
 # ------------------------------------------------------------
-# Fonction de corrélation basique avec le log du service
+# Fonction de correlation basique avec le log du service
 # ------------------------------------------------------------
 __blackbox_correlate() {
     local cmd="$1" ts="$2"
@@ -37,14 +37,14 @@ __blackbox_correlate() {
     current_size=$(stat -c%s "$svc_log" 2>/dev/null || echo 0)
     local pre_size=${__BLACKBOX_PRE_SIZE:-0}
 
-    # S'il y a de nouveaux octets écrits dans le log
+    # S'il y a de nouveaux octets ecrits dans le log
     if [ "$current_size" -gt "$pre_size" ]; then
         local diff_size=$((current_size - pre_size))
         local recent_errors
-        # On lit seulement les nouveaux octets ajoutés après la commande
+        # On lit seulement les nouveaux octets ajoutes apres la commande
         recent_errors=$(tail -c "$diff_size" "$svc_log" 2>/dev/null | grep -iE "error|critical|fail|fatal" | tail -5 | tr '\n' ' ')
         if [ -n "$recent_errors" ]; then
-            log_event "CORR" "Commande '$cmd' corrélée avec erreur(s) récente(s) : ${recent_errors:0:200}"
+            log_event "CORR" "Commande '$cmd' correlee avec erreur(s) recente(s) : ${recent_errors:0:200}"
         fi
     fi
 }
@@ -75,10 +75,10 @@ __blackbox_danger_check() {
 }
 
 # ------------------------------------------------------------
-# Hook exécuté juste AVANT chaque commande (trap DEBUG)
+# Hook execute juste AVANT chaque commande (trap DEBUG)
 # ------------------------------------------------------------
 __blackbox_watch_precmd() {
-    # On mémorise la date et la taille du log du service avant la commande
+    # On memorise la date et la taille du log du service avant la commande
     __BLACKBOX_PRE_TS=$(date '+%Y-%m-%d-%H-%M-%S')
     local svc_log="/var/log/${SERVICE_NAME}/error.log"
     
@@ -95,13 +95,13 @@ __blackbox_watch_precmd() {
 }
 
 # ------------------------------------------------------------
-# Hook exécuté juste APRÈS chaque commande (PROMPT_COMMAND)
+# Hook execute juste APReS chaque commande (PROMPT_COMMAND)
 # ------------------------------------------------------------
 __blackbox_watch_postcmd() {
     local last_exit=$?
     local last_cmd cmdline timestamp hist_line hist_id
     
-    # Récupérer la ligne d'historique complète
+    # Recuperer la ligne d'historique complete
     hist_line=$(history 1 2>/dev/null)
     # Extraire l'ID (premier mot)
     hist_id=$(echo "$hist_line" | awk '{print $1}')
@@ -110,20 +110,20 @@ __blackbox_watch_postcmd() {
     
     [ -z "$last_cmd" ] && return
     
-    # Ignorer la toute première exécution (qui capture la dernière commande de la session précédente)
+    # Ignorer la toute premiere execution (qui capture la derniere commande de la session precedente)
     if [ "$__BLACKBOX_FIRST_RUN" = "true" ]; then
         export __BLACKBOX_FIRST_RUN="false"
         export __BLACKBOX_LAST_HIST_ID="$hist_id"
         return
     fi
 
-    # Anti-doublons : on ignore si l'ID d'historique est le même (ex: juste 'Entrée')
+    # Anti-doublons : on ignore si l'ID d'historique est le même (ex: juste 'Entree')
     if [ "$hist_id" = "$__BLACKBOX_LAST_HIST_ID" ]; then
         return
     fi
     export __BLACKBOX_LAST_HIST_ID="$hist_id"
     
-    # Éviter de capturer le hook lui-même ou des commandes internes
+    # eviter de capturer le hook lui-même ou des commandes internes
     [[ "$last_cmd" == "__blackbox_watch_"* ]] && return
     [[ "$last_cmd" == "history 1" ]] && return
     
@@ -135,15 +135,15 @@ __blackbox_watch_postcmd() {
     # 2. Journaliser le code de retour (RET)
     log_event "RET" "$last_exit"
     
-    # 3. Snapshot système (SNAP)
+    # 3. Snapshot systeme (SNAP)
     local snap
     snap=$(__blackbox_snapshot)
     log_event "SNAP" "$snap"
     
-    # 4. Détection de commandes dangereuses
+    # 4. Detection de commandes dangereuses
     __blackbox_danger_check "$last_cmd"
     
-    # 5. Corrélation avec les logs du service
+    # 5. Correlation avec les logs du service
     __blackbox_correlate "$last_cmd" "$timestamp"
 }
 
@@ -155,51 +155,51 @@ __install_local_hook() {
     export -f __blackbox_snapshot __blackbox_correlate \
     __blackbox_danger_check __blackbox_watch_precmd __blackbox_watch_postcmd log_event
     
-    # On pose le trap DEBUG (avant chaque commande) et PROMPT_COMMAND (après)
+    # On pose le trap DEBUG (avant chaque commande) et PROMPT_COMMAND (apres)
     trap '__blackbox_watch_precmd' DEBUG
     PROMPT_COMMAND="__blackbox_watch_postcmd;${PROMPT_COMMAND:+$PROMPT_COMMAND}"
-    log_event "INFOS" "Hook Watch activé pour la session courante (shell PID $$)"
+    log_event "INFOS" "Hook Watch active pour la session courante (shell PID $$)"
 }
 
 # ------------------------------------------------------------
-# Installation système (root) – pour surveillance multi-utilisateurs
+# Installation systeme (root) – pour surveillance multi-utilisateurs
 # ------------------------------------------------------------
 __install_system_hook() {
     local hook_file="/etc/profile.d/blackbox-watch.sh"
     local install_dir="$(pwd)"
     
     cat > "$hook_file" << 'HOOK_EOF'
-# Blackbox Watch Hook – installé automatiquement
+# Blackbox Watch Hook – installe automatiquement
 export SERVICE_NAME="__SERVICE__"
 export LOG_FILE="__LOG_FILE__"
 export FLAG_VERBOSE="__VERBOSE__"
 export FLAG_NO_STDOUT="true"
 
-# Rechargement des fonctions (Vérification de lisibilité)
+# Rechargement des fonctions (Verification de lisibilite)
 if [ -r "__INSTALL_DIR__/src/utils.sh" ] && [ -r "__INSTALL_DIR__/src/mode_watch.sh" ]; then
     source __INSTALL_DIR__/src/utils.sh
     source __INSTALL_DIR__/src/mode_watch.sh
     
     # Message de bienvenue (Audit Visuel)
     if [ -z "$__BLACKBOX_BANNER_SHOWN" ]; then
-        echo -e "\e[1;31m[!] SURVEILLANCE ACTIVÉE : Ce shell est enregistré par Blackbox.\e[0m"
+        echo -e "\e[1;31m[!] SURVEILLANCE ACTIVeE : Ce shell est enregistre par Blackbox.\e[0m"
         export __BLACKBOX_BANNER_SHOWN="true"
     fi
     
     __install_local_hook
 else
     echo -e "\e[1;33m[!] Blackbox Error : Impossible de lire les fichiers sources dans __INSTALL_DIR__/src/.\e[0m"
-    echo -e "\e[1;90m(Vérifiez les permissions du dossier personnel de l'administrateur)\e[0m"
+    echo -e "\e[1;90m(Verifiez les permissions du dossier personnel de l'administrateur)\e[0m"
 fi
 HOOK_EOF
     sed -i "s|__SERVICE__|$SERVICE_NAME|g" "$hook_file"
     sed -i "s|__LOG_FILE__|$LOG_FILE|g" "$hook_file"
     sed -i "s|__VERBOSE__|$FLAG_VERBOSE|g" "$hook_file"
     sed -i "s|__INSTALL_DIR__|$install_dir|g" "$hook_file"
-    # On s'assure que le répertoire d'installation est accessible en lecture pour tous
+    # On s'assure que le repertoire d'installation est accessible en lecture pour tous
     chmod -R 755 "$install_dir" 2>/dev/null
     
-    log_event "INFOS" "Hook système installé dans $hook_file"
+    log_event "INFOS" "Hook systeme installe dans $hook_file"
 }
 
 # ------------------------------------------------------------
@@ -209,51 +209,51 @@ watch_main() {
     local service="$1"
     log_event "INFOS" "Lancement du mode Watch pour le service '$service'"
     
-    # Vérification : pour une surveillance globale, il faut être root
+    # Verification : pour une surveillance globale, il faut être root
     if [ "$(id -u)" -eq 0 ]; then
-        log_event "INFOS" "Installation du hook système (global)"
+        log_event "INFOS" "Installation du hook systeme (global)"
         __install_system_hook
         
         # Correction automatique des permissions pour Ubuntu (Dossier personnel restreint)
         if [[ "$(pwd)" == /home/* ]]; then
             local user_home=$(echo "$(pwd)" | cut -d/ -f1-3)
-            log_event "INFOS" "Configuration de l'accès public pour $user_home (Audit Multi-Utilisateurs)..."
+            log_event "INFOS" "Configuration de l'acces public pour $user_home (Audit Multi-Utilisateurs)..."
             chmod 755 "$user_home" 2>/dev/null
         fi
 
-        # Alerte Spéciale WSL / Partition Windows
+        # Alerte Speciale WSL / Partition Windows
         if [[ "$(pwd)" == /mnt/* ]]; then
             log_event "WARN" "ATTENTION : Vous êtes sur une partition Windows (/mnt/)."
-            log_event "WARN" "La capture multi-utilisateurs risque d'échouer à cause des permissions WSL."
-            log_event "INFOS" "Conseil : Déplacez le projet dans /home/ pour un test 100% fonctionnel."
+            log_event "WARN" "La capture multi-utilisateurs risque d'echouer a cause des permissions WSL."
+            log_event "INFOS" "Conseil : Deplacez le projet dans /home/ pour un test 100% fonctionnel."
         fi
     else
-        log_event "WARN" "Pas de privilèges root – hook limité à la session courante"
+        log_event "WARN" "Pas de privileges root – hook limite a la session courante"
     fi
     
-    # Activation locale pour le shell courant (on évite la pollution du rcfile)
-    # On définit d'abord les variables et fonctions, puis on lance bash avec le hook activé via PROMPT_COMMAND
+    # Activation locale pour le shell courant (on evite la pollution du rcfile)
+    # On definit d'abord les variables et fonctions, puis on lance bash avec le hook active via PROMPT_COMMAND
     export -f __blackbox_snapshot __blackbox_correlate \
     __blackbox_danger_check __blackbox_danger_patterns \
     __blackbox_watch_precmd __blackbox_watch_postcmd log_event
     
     export __BLACKBOX_FIRST_RUN="true"
     
-    # On prépare un script temporaire minimal qui sera sourcé par le nouveau shell
+    # On prepare un script temporaire minimal qui sera source par le nouveau shell
     local temp_rc
     temp_rc=$(mktemp /tmp/blackbox_rc.XXXXXX)
     cat > "$temp_rc" <<'EOF'
 # Charger le bashrc habituel s'il existe
 [ -f ~/.bashrc ] && source ~/.bashrc 2>/dev/null
 
-# Amélioration du design (Prompt et Bannière)
+# Amelioration du design (Prompt et Banniere)
 export PS1="\[\e[1;31m\][⚫ BLACKBOX WATCH]\[\e[0m\] \[\e[1;34m\]\w\[\e[0m\] \$ "
 
-# Définir le piège DEBUG et PROMPT_COMMAND (sans rien afficher)
+# Definir le piege DEBUG et PROMPT_COMMAND (sans rien afficher)
 trap '__blackbox_watch_precmd' DEBUG
 PROMPT_COMMAND="__blackbox_watch_postcmd;${PROMPT_COMMAND:+$PROMPT_COMMAND}"
 
-# Bannière d'accueil temps réel
+# Banniere d'accueil temps reel
 echo -e "\e[1;31m"
 echo "  ___.   .__                 __  ___.                 "
 echo "  \_ |__ |  | _____    ____ |  | \_ |__   _______  ___"
@@ -262,12 +262,12 @@ echo "   | \_\ \  |__/ __ \\  \___|    <| \_\ (  <_> >    < "
 echo "   |___  /____(____  /\___  >__|_ \___  /\____/__/\_ \\"
 echo "       \/          \/     \/     \/   \/            \/"
 echo -e "\e[0m"
-echo -e "\e[1;33m[*] Mode Surveillance (Watch) Activé. PID: $$\e[0m"
-echo -e "\e[1;36m[*] Enregistrement en temps réel des commandes vers $LOG_FILE\e[0m"
+echo -e "\e[1;33m[*] Mode Surveillance (Watch) Active. PID: $$\e[0m"
+echo -e "\e[1;36m[*] Enregistrement en temps reel des commandes vers $LOG_FILE\e[0m"
 echo -e "\e[1;90m[*] Tapez 'exit' pour quitter le mode watch.\e[0m"
 echo ""
 EOF
     
-    log_event "INFOS" "Session surveillée prête. Lancement d'un shell interactif..."
+    log_event "INFOS" "Session surveillee prête. Lancement d'un shell interactif..."
     exec bash --rcfile "$temp_rc"
 }

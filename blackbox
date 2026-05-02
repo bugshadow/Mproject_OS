@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 
 # ==============================================================================
 # BLACKBOX - Boîte Noire pour Serveurs Linux
@@ -17,8 +17,8 @@ export C_CYAN="\e[36m"
 export C_BRED="\e[1;31m"
 
 # ── Variables Globales ──
-# Configuration des répertoires par défaut
-# Note: Le cahier des charges demande impérativement /var/log/blackbox
+# Configuration des repertoires par defaut
+# Note: Le cahier des charges demande imperativement /var/log/blackbox
 export LOG_DIR="/var/log/blackbox"
 export SERVICE_NAME=""
 export MODE=""
@@ -35,7 +35,7 @@ source ./src/mode_watch.sh
 source ./src/mode_analyze.sh
 source ./src/mode_playback.sh
 
-# ── Fonction centralisée de gestion d'erreur (avec affichage de la doc) ──
+# ── Fonction centralisee de gestion d'erreur (avec affichage de la doc) ──
 die() {
     local code="$1"
     local msg="$2"
@@ -44,7 +44,7 @@ die() {
     log_event "ERROR" "CODE $code : $msg" 2>/dev/null
     
     # 2. Exigence du prof (section 3.2.3) : documentation explicative ET "similaire"
-    # Nous utilisons display_error_help (condensée sans le grand ASCII) au lieu de display_help
+    # Nous utilisons display_error_help (condensee sans le grand ASCII) au lieu de display_help
     display_error_help
     
     # 3. Affichage de la boîte d'erreur TOUT EN BAS pour qu'elle reste visible
@@ -84,28 +84,28 @@ init_environment() {
         export LOG_DIR
     fi
     
-    # Création du dossier de logs s'il n'existe pas
+    # Creation du dossier de logs s'il n'existe pas
     if [ ! -d "$LOG_DIR" ]; then
         mkdir -p "$LOG_DIR" 2>/dev/null
-        # Pour le mode multi-utilisateur, le dossier doit être accessible en écriture
+        # Pour le mode multi-utilisateur, le dossier doit être accessible en ecriture
         chmod 777 "$LOG_DIR" 2>/dev/null
     fi
 
-    # Fichier de log spécifique
+    # Fichier de log specifique
     export LOG_FILE="${LOG_DIR}/history.log"
-    # S'assurer que le fichier est accessible en écriture pour tous les utilisateurs surveillés
+    # S'assurer que le fichier est accessible en ecriture pour tous les utilisateurs surveilles
     [ ! -f "$LOG_FILE" ] && touch "$LOG_FILE" 2>/dev/null
     chmod 666 "$LOG_FILE" 2>/dev/null
     
     export ARCHIVE_DIR="$LOG_DIR/archives"
     
-    # S'assurer que le dossier src est accessible à tous pour le sourcing du hook
+    # S'assurer que le dossier src est accessible a tous pour le sourcing du hook
     [ -d "src" ] && chmod -R 755 src 2>/dev/null
     
     if [ "$MODE" != "restore" ]; then
-        # On tente de créer les dossiers (silencieusement si déjà présents ou erreur de droits)
+        # On tente de creer les dossiers (silencieusement si deja presents ou erreur de droits)
         mkdir -p "$LOG_DIR" "$ARCHIVE_DIR" 2>/dev/null
-        # On prépare le fichier de log
+        # On prepare le fichier de log
         if [ ! -f "$LOG_FILE" ]; then
             touch "$LOG_FILE" 2>/dev/null
         fi
@@ -116,26 +116,26 @@ init_environment() {
 validate() {
     [ "$MODE" = "restore" ] && return
     
-    [ -z "$SERVICE_NAME" ] && die 101 "Paramètre obligatoire manquant. Usage: blackbox [OPTIONS] <SERVICE_NAME>"
+    [ -z "$SERVICE_NAME" ] && die 101 "Parametre obligatoire manquant. Usage: blackbox [OPTIONS] <SERVICE_NAME>"
     
     if [ "$MODE" = "analyze" ] || [ "$MODE" = "watch" ]; then
         local log_path="/var/log/$SERVICE_NAME"
-        # On ne bascule sur les logs de test QUE si l'utilisateur a spécifié un dossier local (commence par ./)
+        # On ne bascule sur les logs de test QUE si l'utilisateur a specifie un dossier local (commence par ./)
         if [[ "$LOG_DIR" == ./* ]]; then
             log_path="./tests/sample_logs"
         fi
         
-        # Test silencieux pour vérifier si on a les droits d'écriture dans le dossier de destination
+        # Test silencieux pour verifier si on a les droits d'ecriture dans le dossier de destination
         if [ ! -w "$LOG_FILE" ] || [ ! -d "$LOG_DIR" ]; then
-             die 103 "Permission refusée. Vous n'avez pas le droit d'écrire dans /var/log/blackbox.\n┃ Solution: Utilisez 'sudo' ou utilisez un dossier local avec l'option '-l ./var_local/log'"
+             die 103 "Permission refusee. Vous n'avez pas le droit d'ecrire dans /var/log/blackbox.\n┃ Solution: Utilisez 'sudo' ou utilisez un dossier local avec l'option '-l ./var_local/log'"
         fi
 
-        # Vérification du répertoire source (Obligatoire pour Analyze, Optionnel pour Watch)
+        # Verification du repertoire source (Obligatoire pour Analyze, Optionnel pour Watch)
         if [ ! -d "$log_path" ] && [ ! -d "/var/log/$SERVICE_NAME" ]; then
             if [ "$MODE" = "analyze" ]; then
-                die 102 "Répertoire source (Dossier de logs) introuvable pour le service '$SERVICE_NAME'"
+                die 102 "Repertoire source (Dossier de logs) introuvable pour le service '$SERVICE_NAME'"
             else
-                log_event "WARN" "Répertoire source introuvable pour '$SERVICE_NAME'. La corrélation automatique sera désactivée."
+                log_event "WARN" "Repertoire source introuvable pour '$SERVICE_NAME'. La correlation automatique sera desactivee."
             fi
         fi
     fi
@@ -148,23 +148,23 @@ validate() {
 mode_restore() { 
     [ "$(id -u)" != "0" ] && die 103 "Tentative d'action critique (restore) sans les droits administrateur (root). Utilisez sudo !"
     rm -rf "$LOG_DIR"
-    log_event "INFOS" "Environnement réinitialisé avec succès"
+    log_event "INFOS" "Environnement reinitialise avec succes"
     exit 0
 }
 
-# ── Dispatcher (Exécution du bon mode) ──
+# ── Dispatcher (Execution du bon mode) ──
 run_mode() {
-    [ -n "$MODE" ] && log_event "INFOS" "blackbox démarré — service: ${SERVICE_NAME:-N/A} — mode: $MODE"
+    [ -n "$MODE" ] && log_event "INFOS" "blackbox demarre — service: ${SERVICE_NAME:-N/A} — mode: $MODE"
     case "$MODE" in
         watch)    watch_main "$SERVICE_NAME" ;;
         analyze)  analyze_main "$SERVICE_NAME" ;;
         playback) playback_main "$SERVICE_NAME" "$PLAYBACK_DATE" ;;
         restore)  mode_restore ;;
-        *) die 100 "Aucun mode principal spécifié (-w, -a, -p, -r) ou option entrée inconnu" ;;
+        *) die 100 "Aucun mode principal specifie (-w, -a, -p, -r) ou option entree inconnu" ;;
     esac
 }
 
-# ── Point d'Entrée Principal ──
+# ── Point d'Entree Principal ──
 main() {
     parse_options "$@"
     
@@ -176,18 +176,18 @@ main() {
     init_environment
     validate
 
-    # Dev 3: Vérification du helper C multithread (Option -t)
+    # Dev 3: Verification du helper C multithread (Option -t)
     if $FLAG_THREAD; then
         export COMPRESS_HELPER="./bin/compress_helper"
         if [ -x "$COMPRESS_HELPER" ]; then
-            log_event "INFOS" "Option Thread activée — compress_helper détecté : $COMPRESS_HELPER"
+            log_event "INFOS" "Option Thread activee — compress_helper detecte : $COMPRESS_HELPER"
         else
-            log_event "WARN" "Option -t activée mais bin/compress_helper introuvable. Lancez 'make' pour compiler."
+            log_event "WARN" "Option -t activee mais bin/compress_helper introuvable. Lancez 'make' pour compiler."
         fi
     fi
 
     if $FLAG_SUBSHELL; then
-        log_event "INFOS" "Mode isolé activé (Subshell)."
+        log_event "INFOS" "Mode isole active (Subshell)."
         echo -e "${C_CYAN}PID parent: $$${C_RESET}"
         (
             export LOG_DIR FLAG_VERBOSE C_RESET C_CYAN C_RED C_GREEN C_YELLOW C_BRED LOG_FILE
