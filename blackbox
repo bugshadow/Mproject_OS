@@ -176,9 +176,14 @@ main() {
     init_environment
     validate
 
-    # TODO Dev 3: Intégration de compress_helper.c (Option Thread)
+    # Dev 3: Vérification du helper C multithread (Option -t)
     if $FLAG_THREAD; then
-        log_event "INFOS" "Option Thread activée. (En attente d'implémentation logique C par Dev 3)"
+        export COMPRESS_HELPER="./bin/compress_helper"
+        if [ -x "$COMPRESS_HELPER" ]; then
+            log_event "INFOS" "Option Thread activée — compress_helper détecté : $COMPRESS_HELPER"
+        else
+            log_event "WARN" "Option -t activée mais bin/compress_helper introuvable. Lancez 'make' pour compiler."
+        fi
     fi
 
     if $FLAG_SUBSHELL; then
