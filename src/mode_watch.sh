@@ -54,13 +54,13 @@ __blackbox_correlate() {
 # ------------------------------------------------------------
 __blackbox_danger_patterns() {
     cat <<'EOF'
-rm\s+-rf\s+/
-chmod\s+777\s+/
-chmod\s+777\s+/(etc|bin|sbin|lib)
-dd\s+if=.*\s+of=/dev/sd
+rm[[:space:]]+-rf[[:space:]]+/
+chmod[[:space:]]+777[[:space:]]+/
+chmod[[:space:]]+777[[:space:]]+/(etc|bin|sbin|lib)
+dd[[:space:]]+if=.*[[:space:]]+of=/dev/sd
 mkfs\.
 :(){ :|:& };:
-> /dev/sda
+>[[:space:]]+/dev/sda
 EOF
 }
 
@@ -174,20 +174,19 @@ __blackbox_watch_postcmd() {
     local last_exit=$?
     local last_cmd cmdline timestamp hist_line hist_id
     
-    # Recuperer la ligne d'historique complete
-    hist_line=$(history 1 2>/dev/null)
+    # Recuperer la ligne d'historique complete (en forcant un format sans horodatage)
+    hist_line=$(HISTTIMEFORMAT= history 1 2>/dev/null)
     # Extraire l'ID (premier mot)
     hist_id=$(echo "$hist_line" | awk '{print $1}')
-    # Extraire la commande
+    # Extraire la commande (tout ce qui suit l'ID et les espaces)
     last_cmd=$(echo "$hist_line" | sed 's/^[ ]*[0-9]\+[ ]*//')
     
     [ -z "$last_cmd" ] && return
     
-    # Ignorer la toute premiere execution (qui capture la derniere commande de la session precedente)
-    if [ "$__BLACKBOX_FIRST_RUN" = "true" ]; then
-        export __BLACKBOX_FIRST_RUN="false"
+    # Initialisation pour les nouvelles sessions (multi-utilisateurs)
+    if [ -z "$__BLACKBOX_LAST_HIST_ID" ]; then
         export __BLACKBOX_LAST_HIST_ID="$hist_id"
-        return
+        [ "$__BLACKBOX_FIRST_RUN" = "true" ] && return
     fi
 
     # Anti-doublons : on ignore si l'ID d'historique est le même (ex: juste 'Entree')
@@ -228,6 +227,9 @@ __install_local_hook() {
     export -f __blackbox_snapshot __blackbox_correlate \
     __blackbox_danger_check __blackbox_watch_precmd __blackbox_watch_postcmd \
     __blackbox_danger_patterns __send_telegram_alert log_event
+    
+    # S'assurer que l'historique est active (requis pour history 1)
+    set -o history
     
     # On pose le trap DEBUG (avant chaque commande) et PROMPT_COMMAND (apres)
     trap '__blackbox_watch_precmd' DEBUG
