@@ -151,6 +151,15 @@ __blackbox_danger_check() {
 # Hook execute juste AVANT chaque commande (trap DEBUG)
 # ------------------------------------------------------------
 __blackbox_watch_precmd() {
+    # Resilience Kali : Si PROMPT_COMMAND a ete ecrase (par .bashrc), on le restaure
+    if [[ "$PROMPT_COMMAND" != *"__blackbox_watch_postcmd"* ]]; then
+        PROMPT_COMMAND="__blackbox_watch_postcmd;${PROMPT_COMMAND:+$PROMPT_COMMAND}"
+    fi
+
+    # Forcer l'activation de l'historique (anti-fraude)
+    set -o history
+    export HISTSIZE=1000
+
     # On memorise la date et la taille du log du service avant la commande
     __BLACKBOX_PRE_TS=$(date '+%Y-%m-%d-%H-%M-%S')
     local svc_log="/var/log/${SERVICE_NAME}/error.log"
@@ -176,6 +185,13 @@ __blackbox_watch_postcmd() {
     
     # Recuperer la ligne d'historique complete (en forcant un format sans horodatage)
     hist_line=$(HISTTIMEFORMAT= history 1 2>/dev/null)
+    
+    # Fallback resilience (si history 1 est vide ou desactive)
+    if [ -z "$hist_line" ]; then
+        hist_line=$(fc -ln -1 2>/dev/null | sed 's/^[[:space:]]*//')
+        [ -n "$hist_line" ] && hist_line="999 $hist_line" # ID fictif pour passer les filtres
+    fi
+
     # Extraire l'ID (premier mot)
     hist_id=$(echo "$hist_line" | awk '{print $1}')
     # Extraire la commande (tout ce qui suit l'ID et les espaces)
