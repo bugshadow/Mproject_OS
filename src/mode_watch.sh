@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # ==============================================================================
 # mode_watch.sh — Module Watch (Dev 1)
 # Boîte noire legere pour serveurs Linux — blackbox
