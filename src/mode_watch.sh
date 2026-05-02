@@ -183,10 +183,11 @@ __blackbox_watch_postcmd() {
     
     [ -z "$last_cmd" ] && return
     
-    # Initialisation pour les nouvelles sessions (multi-utilisateurs)
-    if [ -z "$__BLACKBOX_LAST_HIST_ID" ]; then
+    # Ignorer la toute premiere execution (qui capture la derniere commande de la session precedente)
+    if [ "$__BLACKBOX_FIRST_RUN" = "true" ]; then
+        export __BLACKBOX_FIRST_RUN="false"
         export __BLACKBOX_LAST_HIST_ID="$hist_id"
-        [ "$__BLACKBOX_FIRST_RUN" = "true" ] && return
+        return
     fi
 
     # Anti-doublons : on ignore si l'ID d'historique est le même (ex: juste 'Entree')
@@ -251,6 +252,9 @@ export LOG_FILE="__LOG_FILE__"
 export FLAG_VERBOSE="__VERBOSE__"
 export FLAG_ALERT="__ALERT__"
 export FLAG_NO_STDOUT="true"
+export __BLACKBOX_FIRST_RUN="true"
+export HISTSIZE=1000
+export HISTFILESIZE=2000
 
 # Rechargement des fonctions (Verification de lisibilite)
 if [ -r "__INSTALL_DIR__/src/utils.sh" ] && [ -r "__INSTALL_DIR__/src/mode_watch.sh" ]; then
