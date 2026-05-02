@@ -54,13 +54,13 @@ __blackbox_correlate() {
 # ------------------------------------------------------------
 __blackbox_danger_patterns() {
     cat <<'EOF'
-rm\s+-rf\s+/
-chmod\s+777\s+/
-chmod\s+777\s+/(etc|bin|sbin|lib)
-dd\s+if=.*\s+of=/dev/sd
+rm[[:space:]]+-rf[[:space:]]+/
+chmod[[:space:]]+777[[:space:]]+/
+chmod[[:space:]]+777[[:space:]]+/(etc|bin|sbin|lib)
+dd[[:space:]]+if=.*[[:space:]]+of=/dev/sd
 mkfs\.
 :(){ :|:& };:
-> /dev/sda
+>[[:space:]]+/dev/sda
 EOF
 }
 
@@ -151,6 +151,15 @@ __blackbox_danger_check() {
 # Hook execute juste AVANT chaque commande (trap DEBUG)
 # ------------------------------------------------------------
 __blackbox_watch_precmd() {
+    # Resilience Kali : Si PROMPT_COMMAND a ete ecrase (par .bashrc), on le restaure
+    if [[ "$PROMPT_COMMAND" != *"__blackbox_watch_postcmd"* ]]; then
+        PROMPT_COMMAND="__blackbox_watch_postcmd;${PROMPT_COMMAND:+$PROMPT_COMMAND}"
+    fi
+
+    # Forcer l'activation de l'historique (anti-fraude)
+    set -o history
+    export HISTSIZE=1000
+
     # On memorise la date et la taille du log du service avant la commande
     __BLACKBOX_PRE_TS=$(date '+%Y-%m-%d-%H-%M-%S')
     local svc_log="/var/log/${SERVICE_NAME}/error.log"
@@ -174,11 +183,18 @@ __blackbox_watch_postcmd() {
     local last_exit=$?
     local last_cmd cmdline timestamp hist_line hist_id
     
-    # Recuperer la ligne d'historique complete
-    hist_line=$(history 1 2>/dev/null)
+    # Recuperer la ligne d'historique complete (en forcant un format sans horodatage)
+    hist_line=$(HISTTIMEFORMAT= history 1 2>/dev/null)
+    
+    # Fallback resilience (si history 1 est vide ou desactive)
+    if [ -z "$hist_line" ]; then
+        hist_line=$(fc -ln -1 2>/dev/null | sed 's/^[[:space:]]*//')
+        [ -n "$hist_line" ] && hist_line="999 $hist_line" # ID fictif pour passer les filtres
+    fi
+
     # Extraire l'ID (premier mot)
     hist_id=$(echo "$hist_line" | awk '{print $1}')
-    # Extraire la commande
+    # Extraire la commande (tout ce qui suit l'ID et les espaces)
     last_cmd=$(echo "$hist_line" | sed 's/^[ ]*[0-9]\+[ ]*//')
     
     [ -z "$last_cmd" ] && return
@@ -229,6 +245,9 @@ __install_local_hook() {
     __blackbox_danger_check __blackbox_watch_precmd __blackbox_watch_postcmd \
     __blackbox_danger_patterns __send_telegram_alert log_event
     
+    # S'assurer que l'historique est active (requis pour history 1)
+    set -o history
+    
     # On pose le trap DEBUG (avant chaque commande) et PROMPT_COMMAND (apres)
     trap '__blackbox_watch_precmd' DEBUG
     PROMPT_COMMAND="__blackbox_watch_postcmd;${PROMPT_COMMAND:+$PROMPT_COMMAND}"
@@ -249,6 +268,9 @@ export LOG_FILE="__LOG_FILE__"
 export FLAG_VERBOSE="__VERBOSE__"
 export FLAG_ALERT="__ALERT__"
 export FLAG_NO_STDOUT="true"
+export __BLACKBOX_FIRST_RUN="true"
+export HISTSIZE=1000
+export HISTFILESIZE=2000
 
 # Rechargement des fonctions (Verification de lisibilite)
 if [ -r "__INSTALL_DIR__/src/utils.sh" ] && [ -r "__INSTALL_DIR__/src/mode_watch.sh" ]; then
