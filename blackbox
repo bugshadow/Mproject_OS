@@ -27,6 +27,7 @@ export FLAG_SUBSHELL=false
 export FLAG_FORK=false
 export FLAG_THREAD=false
 export FLAG_VERBOSE=false
+export FLAG_ALERT=false
 export CUSTOM_LOG_DIR=""
 
 # ── Inclusions Modulaires (Dossier src/) ──
@@ -57,7 +58,7 @@ die() {
 
 # ── Parse des options (Getopts complet - Fondation Dev 1) ──
 parse_options() {
-    while getopts ":hwap:sftl:rv" opt; do
+    while getopts ":hwap:sftl:rvA" opt; do
         case $opt in
             h) display_help; exit 0 ;;
             w) MODE="watch" ;;
@@ -67,6 +68,7 @@ parse_options() {
             f) FLAG_FORK=true ;;
             t) FLAG_THREAD=true ;;
             v) FLAG_VERBOSE=true; export FLAG_VERBOSE ;;
+            A) FLAG_ALERT=true; export FLAG_ALERT ;;
             l) CUSTOM_LOG_DIR="$OPTARG" ;;
             r) MODE="restore" ;;
             ?) die 100 "Option inconnue: -$OPTARG" ;;
@@ -190,7 +192,7 @@ main() {
         log_event "INFOS" "Mode isole active (Subshell)."
         echo -e "${C_CYAN}PID parent: $$${C_RESET}"
         (
-            export LOG_DIR FLAG_VERBOSE C_RESET C_CYAN C_RED C_GREEN C_YELLOW C_BRED LOG_FILE
+            export LOG_DIR FLAG_VERBOSE FLAG_ALERT C_RESET C_CYAN C_RED C_GREEN C_YELLOW C_BRED LOG_FILE
             echo -e "${C_CYAN}PID sous-shell: $BASHPID${C_RESET}"
             run_mode
         )

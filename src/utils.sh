@@ -108,6 +108,7 @@ ${C_CYAN}OPTIONS SUPPLeMENTAIRES${C_RESET}
       ${C_YELLOW}-t, --thread${C_RESET}      Optimisation par threads Pthreads en C (.bin/compress_helper) pour -p.
       ${C_YELLOW}-l <REP>${C_RESET}          Specifie un chemin de log alternatif (Defaut: /var/log/blackbox).
       ${C_YELLOW}-v, --verbose${C_RESET}     Affiche en temps reel le detail des operations en arriere-plan.
+      ${C_YELLOW}-A, --alert${C_RESET}       Active les alertes Telegram (Mode Watch).
       ${C_YELLOW}-r, --restore${C_RESET}     Detruit et reinitialise tous les journaux du daemon (Mode ROOT exige).
       ${C_YELLOW}-h, --help${C_RESET}        Affiche ce manuel d'utilisation standard.
 
@@ -146,6 +147,7 @@ display_error_help() {
     echo -e "      ${C_YELLOW}-f, --fork${C_RESET}     : Active le multiprocessing (decoupage) en arriere-plan."
     echo -e "      ${C_YELLOW}-t, --thread${C_RESET}   : Optimisation par threads Pthreads en C."
     echo -e "      ${C_YELLOW}-l <REP>${C_RESET}       : Specifie un repertoire de stockage des logs."
+    echo -e "      ${C_YELLOW}-A, --alert${C_RESET}       : Active les alertes Telegram (Mode Watch)."
     echo -e "      ${C_YELLOW}-r, --restore${C_RESET}  : Reinitialise les parametres par defaut (Admin)."
     echo -e "\n${C_CYAN}Pour lire le manuel complet avec des exemples, tapez :${C_RESET} ./blackbox -h"
     echo -e "${C_YELLOW}----------------------------${C_RESET}\n"

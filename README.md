@@ -61,6 +61,7 @@ Blackbox s'exécute selon la syntaxe suivante : `blackbox [OPTIONS] <SERVICE_NAM
 - `-s, --subshell` : Isole l'exécution du daemon de surveillance dans un sous-shell.
 - `-f, --fork`     : Active le découpage des gros fichiers logs et l'analyse via processus parallèles.
 - `-t, --thread`   : Utilise le module développé en C (Pthreads) pour la compression asynchrone.
+- `-A, --alert`    : Active les alertes Telegram instantanées lors d'une détection de danger.
 - `-l <REP>`       : Définit un répertoire personnalisé pour les journaux (`-l ./var/log`).
 - `-v, --verbose`  : Affiche les détails des opérations en temps réel.
 - `-r, --restore`  : Supprime et rénitialise tous les logs (Nécessite les privilèges `sudo`).
@@ -252,8 +253,8 @@ cat /etc/shadow
 
 ## 9. Fonctionnalité Bonus : Intégration Telegram (Real-Time SOC)
 
-Pour rapprocher ce projet des standards professionnels des Security Operations Centers (SOC), Blackbox intègre une API de notification en temps réel.
-Dès qu'une commande dangereuse (ex : `chmod 777`) est tapée sur un terminal compromis, Blackbox envoie de manière **asynchrone** (via un `Subshell &` et `curl`) une alerte formatée vers l'application Telegram de l'administrateur système.
+Pour rapprocher ce projet des standards professionnels des Security Operations Centers (SOC), Blackbox intègre une API de notification en temps réel via l'option **`-A, --alert`**.
+Dès qu'une commande dangereuse (ex : `chmod 777`) est tapée sur un terminal compromis, Blackbox envoie de manière **asynchrone** (via un `Subshell &` et `curl`) une alerte riche (HTML) vers l'application Telegram de l'administrateur système.
 
 ### Configuration du Bot :
 1. Fichier : Créez (ou modifiez) un fichier `.env` à la racine du projet.
@@ -265,10 +266,6 @@ Dès qu'une commande dangereuse (ex : `chmod 777`) est tapée sur un terminal co
 3. Test immédiat : `bash tests/test_telegram_alert.sh`
 
 *(Note: Le .env est ignoré dynamiquement via le `.gitignore` pour prévenir toute fuite de clés API).*
-
----
-**Module : Théorie des systèmes d'exploitation & SE Windows/Unix/Linux**
-*École Normale Supérieure de l'Enseignement Technique de Mohammedia (ENSET) — 2026*
 
 ---
 **Module : Théorie des systèmes d'exploitation & SE Windows/Unix/Linux**

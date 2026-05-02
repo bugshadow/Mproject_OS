@@ -55,6 +55,7 @@ __blackbox_correlate() {
 __blackbox_danger_patterns() {
     cat <<'EOF'
 rm\s+-rf\s+/
+chmod\s+777\s+/
 chmod\s+777\s+/(etc|bin|sbin|lib)
 dd\s+if=.*\s+of=/dev/sd
 mkfs\.
@@ -67,11 +68,17 @@ EOF
 # Envoi d'une alerte Telegram via Bot API (Bonus)
 # ------------------------------------------------------------
 __send_telegram_alert() {
+    # On ne lance l'alerte que si le flag --alert est actif
+    if [ "$FLAG_ALERT" != "true" ]; then
+        return
+    fi
+
     local cmd_intercepted="$1"
     
-    # --- Chargement sécurisé depuis le fichier .env ---
-    if [ -f "./.env" ]; then
-        source "./.env"
+    # --- Chargement sécurisé depuis le fichier .env (Chemin absolu) ---
+    local env_file="${BLACKBOX_PROJECT_ROOT:-.}/.env"
+    if [ -f "$env_file" ]; then
+        source "$env_file"
     fi
     
     # On abort si les champs nécessaires ne sont pas configurés
@@ -84,7 +91,7 @@ __send_telegram_alert() {
         curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_CHAT_ID}" \
             -d parse_mode="HTML" \
-            --data-urlencode "text=� <b>ALERTE DE SÉCURITÉ BLACKBOX</b> 🔴
+            --data-urlencode "text=🚨 <b>ALERTE DE SÉCURITÉ BLACKBOX</b> 🔴
 <i>Système de Détection d'Intrusion (IDS)</i>
 ➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖
 
@@ -105,6 +112,26 @@ __send_telegram_alert() {
     fi
 }
 
+# ------------------------------------------------------------
+# Envoi d'une alerte SMS via l'API Twilio (Bonus)
+# ------------------------------------------------------------
+# __send_twilio_sms_alert() {
+#     local cmd_intercepted="$1"
+    
+#     if [ -f "./.env" ]; then source "./.env"; fi
+#     if [ -z "$TWILIO_ACCOUNT_SID" ] || [ -z "$TWILIO_AUTH_TOKEN" ]; then return; fi
+    
+#     if command -v curl >/dev/null 2>&1; then
+#         # SMS court (limite à 160 char)
+#         curl -s -X POST "https://api.twilio.com/2010-04-01/Accounts/$TWILIO_ACCOUNT_SID/Messages.json" \
+#             --data-urlencode "Body=🚨 URGENCE BLACKBOX: Commande dangereuse ($cmd_intercepted) exécutée par $USER sur $(hostname)." \
+#             --data-urlencode "From=$TWILIO_FROM_NUMBER" \
+#             --data-urlencode "To=$TWILIO_TO_NUMBER" \
+#             -u "$TWILIO_ACCOUNT_SID:$TWILIO_AUTH_TOKEN" \
+#             -o /dev/null &
+#     fi
+# }
+
 __blackbox_danger_check() {
     local cmd="$1"
     while read -r pattern; do
@@ -112,7 +139,7 @@ __blackbox_danger_check() {
         if echo "$cmd" | grep -Eq "$pattern"; then
             log_event "DANGER" "Commande dangereuse : $cmd"
             
-            # ---> Déclenchement de l'alerte Telegram <---
+            # ---> Déclenchement de l'alerte Telegram (si -A activé) <---
             __send_telegram_alert "$cmd"
             
             return
@@ -199,7 +226,8 @@ __blackbox_watch_postcmd() {
 __install_local_hook() {
     # Ces fonctions sont rendues disponibles dans le shell courant
     export -f __blackbox_snapshot __blackbox_correlate \
-    __blackbox_danger_check __blackbox_watch_precmd __blackbox_watch_postcmd log_event
+    __blackbox_danger_check __blackbox_watch_precmd __blackbox_watch_postcmd \
+    __blackbox_danger_patterns __send_telegram_alert log_event
     
     # On pose le trap DEBUG (avant chaque commande) et PROMPT_COMMAND (apres)
     trap '__blackbox_watch_precmd' DEBUG
@@ -219,12 +247,14 @@ __install_system_hook() {
 export SERVICE_NAME="__SERVICE__"
 export LOG_FILE="__LOG_FILE__"
 export FLAG_VERBOSE="__VERBOSE__"
+export FLAG_ALERT="__ALERT__"
 export FLAG_NO_STDOUT="true"
 
 # Rechargement des fonctions (Verification de lisibilite)
 if [ -r "__INSTALL_DIR__/src/utils.sh" ] && [ -r "__INSTALL_DIR__/src/mode_watch.sh" ]; then
-    source __INSTALL_DIR__/src/utils.sh
-    source __INSTALL_DIR__/src/mode_watch.sh
+    export BLACKBOX_PROJECT_ROOT="__INSTALL_DIR__"
+    source "__INSTALL_DIR__/src/utils.sh"
+    source "__INSTALL_DIR__/src/mode_watch.sh"
     
     # Message de bienvenue (Audit Visuel)
     if [ -z "$__BLACKBOX_BANNER_SHOWN" ]; then
@@ -241,6 +271,7 @@ HOOK_EOF
     sed -i "s|__SERVICE__|$SERVICE_NAME|g" "$hook_file"
     sed -i "s|__LOG_FILE__|$LOG_FILE|g" "$hook_file"
     sed -i "s|__VERBOSE__|$FLAG_VERBOSE|g" "$hook_file"
+    sed -i "s|__ALERT__|$FLAG_ALERT|g" "$hook_file"
     sed -i "s|__INSTALL_DIR__|$install_dir|g" "$hook_file"
     # On s'assure que le repertoire d'installation est accessible en lecture pour tous
     chmod -R 755 "$install_dir" 2>/dev/null
@@ -277,11 +308,8 @@ watch_main() {
         log_event "WARN" "Pas de privileges root – hook limite a la session courante"
     fi
     
-    # Activation locale pour le shell courant (on evite la pollution du rcfile)
-    # On definit d'abord les variables et fonctions, puis on lance bash avec le hook active via PROMPT_COMMAND
-    export -f __blackbox_snapshot __blackbox_correlate \
-    __blackbox_danger_check __blackbox_danger_patterns \
-    __blackbox_watch_precmd __blackbox_watch_postcmd log_event
+    # Activation locale pour le shell courant
+    __install_local_hook
     
     export __BLACKBOX_FIRST_RUN="true"
     
