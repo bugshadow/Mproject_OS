@@ -91,7 +91,8 @@ ${C_CYAN}MODES D'EXeCUTION PRINCIPAUX${C_RESET} (Un seul mode a la fois)
       ${C_YELLOW}-w${C_RESET}  (Watch)
           Mets en place une surveillance continue. Intercepte le flux des commandes du terminal,
           enregistre des snapshots des performances et alerte face aux executions destructrices
-          (ex: rm -rf /, chmod 777 /etc). [Module Dev 1 - Actif]
+          (ex: rm -rf /, chmod 777 /etc) avec envoi de notifications instantanees Telegram.
+          [Module Dev 1 - Actif]
           
       ${C_YELLOW}-a${C_RESET}  (Analyze)
           Analyse forensique. Parcourt, agrege et audite les fichiers logs du service cible.

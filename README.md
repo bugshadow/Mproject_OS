@@ -249,5 +249,27 @@ cat /etc/shadow
 **Observation** : Le rejeu pas-à-pas (Playback) donne l'illusion de regarder un enregistrement vidéo de la session du technicien, permettant de détecter exactement à quelle seconde une commande destructive a été initiée.
 
 ---
+
+## 9. Fonctionnalité Bonus : Intégration Telegram (Real-Time SOC)
+
+Pour rapprocher ce projet des standards professionnels des Security Operations Centers (SOC), Blackbox intègre une API de notification en temps réel.
+Dès qu'une commande dangereuse (ex : `chmod 777`) est tapée sur un terminal compromis, Blackbox envoie de manière **asynchrone** (via un `Subshell &` et `curl`) une alerte formatée vers l'application Telegram de l'administrateur système.
+
+### Configuration du Bot :
+1. Fichier : Créez (ou modifiez) un fichier `.env` à la racine du projet.
+2. Contenu requis :
+   ```env
+   TELEGRAM_BOT_TOKEN="votre_token_du_botfather"
+   TELEGRAM_CHAT_ID="votre_id_telegram"
+   ```
+3. Test immédiat : `bash tests/test_telegram_alert.sh`
+
+*(Note: Le .env est ignoré dynamiquement via le `.gitignore` pour prévenir toute fuite de clés API).*
+
+---
+**Module : Théorie des systèmes d'exploitation & SE Windows/Unix/Linux**
+*École Normale Supérieure de l'Enseignement Technique de Mohammedia (ENSET) — 2026*
+
+---
 **Module : Théorie des systèmes d'exploitation & SE Windows/Unix/Linux**
 *École Normale Supérieure de l'Enseignement Technique de Mohammedia (ENSET) — 2026*

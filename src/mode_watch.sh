@@ -63,12 +63,58 @@ mkfs\.
 EOF
 }
 
+# ------------------------------------------------------------
+# Envoi d'une alerte Telegram via Bot API (Bonus)
+# ------------------------------------------------------------
+__send_telegram_alert() {
+    local cmd_intercepted="$1"
+    
+    # --- Chargement sécurisé depuis le fichier .env ---
+    if [ -f "./.env" ]; then
+        source "./.env"
+    fi
+    
+    # On abort si les champs nécessaires ne sont pas configurés
+    if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+        return
+    fi
+    
+    if command -v curl >/dev/null 2>&1; then
+        # Le "&" final lance la requête en arrière-plan (Subshell) pour ne pas figer le terminal de l'utilisateur
+        curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d parse_mode="HTML" \
+            --data-urlencode "text=� <b>ALERTE DE SÉCURITÉ BLACKBOX</b> 🔴
+<i>Système de Détection d'Intrusion (IDS)</i>
+➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖➖
+
+⚠️ <b>Niveau de Menace :</b> <code>CRITIQUE</code>
+🎯 <b>Type :</b> Exécution de commande dangereuse
+
+📋 <b>CONTEXTE D'EXÉCUTION</b>
+👤 <b>Utilisateur :</b> <code>$USER</code>
+💻 <b>Machine :</b> <code>$(hostname)</code>
+📂 <b>Chemin :</b> <code>$PWD</code>
+🕒 <b>Date & Heure :</b> <code>$(date '+%Y-%m-%d %H:%M:%S')</code>
+
+☠️ <b>COMMANDE INTERCEPTÉE :</b>
+<pre><code class=\"language-bash\">$cmd_intercepted</code></pre>
+
+🛡️ <i>Blackbox Watch Mode — Le processus se poursuit, prière de vérifier les serveurs.</i>" \
+            -o /dev/null &
+    fi
+}
+
 __blackbox_danger_check() {
     local cmd="$1"
     while read -r pattern; do
         [ -z "$pattern" ] && continue
         if echo "$cmd" | grep -Eq "$pattern"; then
             log_event "DANGER" "Commande dangereuse : $cmd"
+            
+            # ---> Déclenchement de l'alerte Telegram <---
+            __send_telegram_alert "$cmd"
+            
             return
         fi
     done < <(__blackbox_danger_patterns)
