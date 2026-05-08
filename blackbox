@@ -18,7 +18,7 @@ export C_BRED="\e[1;31m"
 
 # ── Variables Globales ──
 # Configuration des repertoires par defaut
-# Note: Le cahier des charges demande imperativement /var/log/blackbox
+
 export LOG_DIR="/var/log/blackbox"
 export SERVICE_NAME=""
 export MODE=""
