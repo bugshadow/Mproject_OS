@@ -85,14 +85,18 @@ __send_telegram_alert() {
     if [ -f "$env_file" ]; then
         source "$env_file"
     else
-        echo -e "\n\e[1;41;37m ! ERREUR BLACKBOX \e[0m\e[1;31m Impossible de trouver le fichier .env authentique ! L'alerte Telegram a échoué.\e[0m\n" >&2
+        if [ "$(id -u)" -eq 0 ]; then
+            echo -e "\n\e[1;41;37m ⚠️ ERREUR BLACKBOX \e[0m\e[1;31m Impossible de trouver le fichier .env authentique ! L'alerte Telegram a échoué.\e[0m\n" >&2
+        fi
         log_event "ERROR" "Fichier .env introuvable. Notification Telegram annulée."
         return
     fi
     
     # On abort si les champs nécessaires ne sont pas configurés
     if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-        echo -e "\n\e[1;43;30m ! AVERTISSEMENT BLACKBOX \e[0m\e[1;33m Identifiants Telegram (TOKEN ou CHAT_ID) manquants dans le fichier .env.\e[0m\n" >&2
+        if [ "$(id -u)" -eq 0 ]; then
+            echo -e "\n\e[1;43;30m ⚠️ AVERTISSEMENT BLACKBOX \e[0m\e[1;33m Identifiants Telegram (TOKEN ou CHAT_ID) manquants dans le fichier .env.\e[0m\n" >&2
+        fi
         log_event "ERROR" "Configuration Telegram incomplète. Notification annulée."
         return
     fi
