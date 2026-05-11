@@ -61,6 +61,15 @@ dd[[:space:]]+if=.*[[:space:]]+of=/dev/sd
 mkfs\.
 :(){ :|:& };:
 >[[:space:]]+/dev/sda
+wget[[:space:]]+.*\|[[:space:]]*(bash|sh)
+curl[[:space:]]+.*\|[[:space:]]*(bash|sh)
+nc[[:space:]]+.*-e[[:space:]]+/bin/(bash|sh)
+cat[[:space:]]+/etc/shadow
+echo[[:space:]]+.*>[[:space:]]+/etc/passwd
+useradd[[:space:]]+.*-u[[:space:]]+0
+iptables[[:space:]]+-F
+crontab[[:space:]]+-r
+commande_test_fictive_telegram
 EOF
 }
 
