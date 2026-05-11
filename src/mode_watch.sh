@@ -61,6 +61,15 @@ dd[[:space:]]+if=.*[[:space:]]+of=/dev/sd
 mkfs\.
 :(){ :|:& };:
 >[[:space:]]+/dev/sda
+wget[[:space:]]+.*\|[[:space:]]*(bash|sh)
+curl[[:space:]]+.*\|[[:space:]]*(bash|sh)
+nc[[:space:]]+.*-e[[:space:]]+/bin/(bash|sh)
+cat[[:space:]]+/etc/shadow
+echo[[:space:]]+.*>[[:space:]]+/etc/passwd
+useradd[[:space:]]+.*-u[[:space:]]+0
+iptables[[:space:]]+-F
+crontab[[:space:]]+-r
+commande_test_fictive_telegram
 EOF
 }
 
@@ -76,18 +85,33 @@ __send_telegram_alert() {
     local cmd_intercepted="$1"
     
     # --- Chargement sécurisé depuis le fichier .env (Chemin absolu) ---
-    local env_file="${BLACKBOX_PROJECT_ROOT:-.}/.env"
+    local env_file="/home/${SUDO_USER:-$USER}/Mproject_OS/.env"
+    if [ ! -f "$env_file" ]; then
+        # Fallback au cas ou le dossier serait différent
+        env_file="${BLACKBOX_PROJECT_ROOT:-.}/.env"
+    fi
+    
     if [ -f "$env_file" ]; then
         source "$env_file"
+    else
+        if [ "$(id -u)" -eq 0 ]; then
+            echo -e "\n\e[1;41;37m ⚠️ ERREUR BLACKBOX \e[0m\e[1;31m Impossible de trouver le fichier .env authentique ! L'alerte Telegram a échoué.\e[0m\n" >&2
+        fi
+        log_event "ERROR" "Fichier .env introuvable. Notification Telegram annulée."
+        return
     fi
     
     # On abort si les champs nécessaires ne sont pas configurés
     if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+        if [ "$(id -u)" -eq 0 ]; then
+            echo -e "\n\e[1;43;30m ⚠️ AVERTISSEMENT BLACKBOX \e[0m\e[1;33m Identifiants Telegram (TOKEN ou CHAT_ID) manquants dans le fichier .env.\e[0m\n" >&2
+        fi
+        log_event "ERROR" "Configuration Telegram incomplète. Notification annulée."
         return
     fi
     
     if command -v curl >/dev/null 2>&1; then
-        # Le "&" final lance la requête en arrière-plan (Subshell) pour ne pas figer le terminal de l'utilisateur
+        # Utilisation de disown pour retirer la tâche de la liste des jobs du shell
         curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_CHAT_ID}" \
             -d parse_mode="HTML" \
@@ -108,7 +132,8 @@ __send_telegram_alert() {
 <pre><code class=\"language-bash\">$cmd_intercepted</code></pre>
 
 🛡️ <i>Blackbox Watch Mode — Le processus se poursuit, prière de vérifier les serveurs.</i>" \
-            -o /dev/null &
+            -o /dev/null >/dev/null 2>&1 &
+        disown
     fi
 }
 
@@ -307,6 +332,28 @@ HOOK_EOF
 watch_main() {
     local service="$1"
     log_event "INFOS" "Lancement du mode Watch pour le service '$service'"
+    
+    # --- Vérification anticipée du .env si le flag Alert est activé ---
+    if [ "$FLAG_ALERT" = "true" ]; then
+        log_event "INFOS" "Vibration de la configuration des alertes (Telegram)..."
+        local env_file="/home/${SUDO_USER:-$USER}/Mproject_OS/.env"
+        if [ ! -f "$env_file" ]; then
+            env_file="${BLACKBOX_PROJECT_ROOT:-$(pwd)}/.env"
+        fi
+        
+        if [ -f "$env_file" ]; then
+            source "$env_file"
+            if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+                echo -e "\n\e[1;43;30m ⚠️ AVERTISSEMENT BLACKBOX \e[0m\e[1;33m Option -A activée mais identifiants Telegram (TOKEN/CHAT_ID) manquants dans .env. L'alerte ne fonctionnera pas.\e[0m\n" >&2
+                log_event "WARN" "Identifiants Telegram manquants au démarrage."
+            else
+                log_event "INFOS" "Configuration Telegram valide détectée."
+            fi
+        else
+            echo -e "\n\e[1;41;37m ⚠️ ERREUR BLACKBOX \e[0m\e[1;31m Option -A activée mais fichier .env introuvable ! L'alerte Telegram est compromise.\e[0m\n" >&2
+            log_event "ERROR" "Fichier .env introuvable au démarrage."
+        fi
+    fi
     
     # Verification : pour une surveillance globale, il faut être root
     if [ "$(id -u)" -eq 0 ]; then
