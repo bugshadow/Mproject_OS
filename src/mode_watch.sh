@@ -323,6 +323,28 @@ watch_main() {
     local service="$1"
     log_event "INFOS" "Lancement du mode Watch pour le service '$service'"
     
+    # --- Vérification anticipée du .env si le flag Alert est activé ---
+    if [ "$FLAG_ALERT" = "true" ]; then
+        log_event "INFOS" "Vibration de la configuration des alertes (Telegram)..."
+        local env_file="/home/${SUDO_USER:-$USER}/Mproject_OS/.env"
+        if [ ! -f "$env_file" ]; then
+            env_file="${BLACKBOX_PROJECT_ROOT:-$(pwd)}/.env"
+        fi
+        
+        if [ -f "$env_file" ]; then
+            source "$env_file"
+            if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+                echo -e "\n\e[1;43;30m ⚠️ AVERTISSEMENT BLACKBOX \e[0m\e[1;33m Option -A activée mais identifiants Telegram (TOKEN/CHAT_ID) manquants dans .env. L'alerte ne fonctionnera pas.\e[0m\n" >&2
+                log_event "WARN" "Identifiants Telegram manquants au démarrage."
+            else
+                log_event "INFOS" "Configuration Telegram valide détectée."
+            fi
+        else
+            echo -e "\n\e[1;41;37m ⚠️ ERREUR BLACKBOX \e[0m\e[1;31m Option -A activée mais fichier .env introuvable ! L'alerte Telegram est compromise.\e[0m\n" >&2
+            log_event "ERROR" "Fichier .env introuvable au démarrage."
+        fi
+    fi
+    
     # Verification : pour une surveillance globale, il faut être root
     if [ "$(id -u)" -eq 0 ]; then
         log_event "INFOS" "Installation du hook systeme (global)"
