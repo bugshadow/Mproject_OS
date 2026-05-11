@@ -102,8 +102,8 @@ __send_telegram_alert() {
     fi
     
     if command -v curl >/dev/null 2>&1; then
-        # Utilisation de nohup pour eviter les messages de job control et detacher la tâche
-        nohup curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+        # Utilisation de disown pour retirer la tâche de la liste des jobs du shell
+        curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_CHAT_ID}" \
             -d parse_mode="HTML" \
             --data-urlencode "text=🚨 <b>ALERTE DE SÉCURITÉ BLACKBOX</b> 🔴
@@ -124,6 +124,7 @@ __send_telegram_alert() {
 
 🛡️ <i>Blackbox Watch Mode — Le processus se poursuit, prière de vérifier les serveurs.</i>" \
             -o /dev/null >/dev/null 2>&1 &
+        disown
     fi
 }
 
