@@ -194,7 +194,7 @@ playback_main() {
 # COMPRESSION DU LOG VIA LE HELPER C MULTITHREADe (Option -t)
 # ==============================================================================
 _playback_compress_log() {
-    local helper="./bin/compress_helper"
+    local helper="${PROJECT_DIR:-.}/bin/compress_helper"
 
     if [ ! -x "$helper" ]; then
         log_event "WARN" "compress_helper introuvable ou non executable. Lancez 'make' d'abord."

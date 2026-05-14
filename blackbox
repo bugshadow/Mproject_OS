@@ -30,11 +30,15 @@ export FLAG_VERBOSE=false
 export FLAG_ALERT=false
 export CUSTOM_LOG_DIR=""
 
+# ── Decouverte dynamique du repertoire du script ──
+# Permet l'execution depuis n'importe ou via symlink (make install)
+export PROJECT_DIR="$(dirname "$(readlink -f "$0")")"
+
 # ── Inclusions Modulaires (Dossier src/) ──
-source ./src/utils.sh
-source ./src/mode_watch.sh
-source ./src/mode_analyze.sh
-source ./src/mode_playback.sh
+source "$PROJECT_DIR/src/utils.sh"
+source "$PROJECT_DIR/src/mode_watch.sh"
+source "$PROJECT_DIR/src/mode_analyze.sh"
+source "$PROJECT_DIR/src/mode_playback.sh"
 
 # ── Fonction centralisee de gestion d'erreur (avec affichage de la doc) ──
 die() {
@@ -180,7 +184,7 @@ main() {
 
     # Dev 3: Verification du helper C multithread (Option -t)
     if $FLAG_THREAD; then
-        export COMPRESS_HELPER="./bin/compress_helper"
+        export COMPRESS_HELPER="$PROJECT_DIR/bin/compress_helper"
         if [ -x "$COMPRESS_HELPER" ]; then
             log_event "INFOS" "Option Thread activee — compress_helper detecte : $COMPRESS_HELPER"
         else

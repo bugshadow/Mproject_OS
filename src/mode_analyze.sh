@@ -581,7 +581,7 @@ _phase_generate_report() {
 
     if [ "$FLAG_THREAD" = true ]; then
         # Utilisation du helper C multithreade (Exigence -t)
-        local helper="./bin/compress_helper"
+        local helper="${PROJECT_DIR:-.}/bin/compress_helper"
         if [ -x "$helper" ]; then
             log_event "INFOS" "Compression multithreadee du rapport avec $helper"
             if "$helper" -j 4 "$archive_path" "$report_txt"; then
