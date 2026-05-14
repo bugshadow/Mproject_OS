@@ -36,7 +36,7 @@ clean:
 
 install:
 	@echo "Installation de blackbox dans /usr/local/bin (peut necessiter les droits administrateur/sudo)..."
-	@ln -sf $(PWD)/blackbox /usr/local/bin/blackbox
+	@ln -sf $(CURDIR)/blackbox /usr/local/bin/blackbox
 	@printf "\033[1;32m[✓] Installation terminee ! Vous pouvez maintenant utiliser la commande 'blackbox' depuis n'importe quel dossier.\033[0m\n"
 
 uninstall:

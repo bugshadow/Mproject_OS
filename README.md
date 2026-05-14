@@ -36,7 +36,7 @@ Afin de respecter le cahier des charges et de permettre une véritable surveilla
 
 ```bash
 # 1. Cloner le référentiel
-git clone -b omar https://github.com/bugshadow/Mproject_OS.git
+git clone https://github.com/bugshadow/Mproject_OS.git
 cd Mproject_OS
 
 # 2. Configurer les permissions et compiler l'utilitaire C (Multithreading)
