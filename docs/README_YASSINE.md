@@ -6,16 +6,16 @@ Ce document certifie la vérification et la mise en conformité du script `black
 
 | Exigence du Cahier des charges | Statut | Détails de l'implémentation |
 | :--- | :---: | :--- |
-| **Paramètre obligatoire** (`blackbox -w <SERVICE>`) | ✅ | Géré nativement par la boucle `getopts` dans le script principal. |
-| **Hook interactif** (PROMPT_COMMAND) | ✅ | Implémenté de manière optimale sans avoir besoin d'installer `auditd`. |
-| **Format du fichier log** | ✅ | Format strict `AAAA-MM-JJ-HH-MM-SS : USER : TYPE : MSG` scrupuleusement respecté. |
-| **Instantané Système (SNAP)** | ✅ | Capture bien la charge CPU, l'état de la RAM, l'espace Disque et le Top 5 des processus. |
-| **Sécurité Multi-process (flock)** | ✅ | Les écritures dans le fichier partagé `history.log` sont protégées par `flock`. |
-| **Corrélation Automatique (CORR)** | ✅ | Le système croise le timestamp des commandes avec les nouveaux logs d'erreur apparus. |
-| **Détection des Dangers (DANGER)** | ✅ | Les motifs d'expressions régulières (`rm -rf /`, `chmod 777`) sont interceptés avec alerte immédiate. |
-| **Double sortie obligatoire** | ✅ | L'enregistrement est silencieux dans le fichier, mais visible sur le terminal via le flag `-v`. |
-| **Auto-help sur erreur** | ✅ | Le script affiche la documentation automatiquement en cas d'argument manquant (Codes 100-104). |
-| **Mode Daemon / Root** | ✅ | L'installation globale crée bien un hook dans `/etc/profile.d/` si exécuté en `sudo`. |
+| **Paramètre obligatoire** (`blackbox -w <SERVICE>`) |  | Géré nativement par la boucle `getopts` dans le script principal. |
+| **Hook interactif** (PROMPT_COMMAND) |  | Implémenté de manière optimale sans avoir besoin d'installer `auditd`. |
+| **Format du fichier log** |  | Format strict `AAAA-MM-JJ-HH-MM-SS : USER : TYPE : MSG` scrupuleusement respecté. |
+| **Instantané Système (SNAP)** |  | Capture bien la charge CPU, l'état de la RAM, l'espace Disque et le Top 5 des processus. |
+| **Sécurité Multi-process (flock)** |  | Les écritures dans le fichier partagé `history.log` sont protégées par `flock`. |
+| **Corrélation Automatique (CORR)** |  | Le système croise le timestamp des commandes avec les nouveaux logs d'erreur apparus. |
+| **Détection des Dangers (DANGER)** |  | Les motifs d'expressions régulières (`rm -rf /`, `chmod 777`) sont interceptés avec alerte immédiate. |
+| **Double sortie obligatoire** |  | L'enregistrement est silencieux dans le fichier, mais visible sur le terminal via le flag `-v`. |
+| **Auto-help sur erreur** |  | Le script affiche la documentation automatiquement en cas d'argument manquant (Codes 100-104). |
+| **Mode Daemon / Root** |  | L'installation globale crée bien un hook dans `/etc/profile.d/` si exécuté en `sudo`. |
 
 ---
 
