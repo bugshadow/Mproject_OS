@@ -33,3 +33,13 @@ build:
 clean:
 	@echo "Nettoyage des anciens fichiers binaires..."
 	@rm -rf $(BIN_DIR)/*
+
+install:
+	@echo "Installation de blackbox dans /usr/local/bin (peut necessiter les droits administrateur/sudo)..."
+	@ln -sf $(PWD)/blackbox /usr/local/bin/blackbox
+	@printf "\033[1;32m[✓] Installation terminee ! Vous pouvez maintenant utiliser la commande 'blackbox' depuis n'importe quel dossier.\033[0m\n"
+
+uninstall:
+	@echo "Desinstallation de blackbox (peut necessiter les droits administrateur/sudo)..."
+	@rm -f /usr/local/bin/blackbox
+	@printf "\033[1;32m[✓] Desinstallation terminee !\033[0m\n"
