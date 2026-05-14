@@ -4,7 +4,7 @@ SRC_DIR = src
 BIN_DIR = bin
 
 # La règle par défaut DOIT être la première du fichier
-all: init clean create_dirs build install success
+all: init clean create_dirs build install env_setup success
 
 # Ajout d'une règle "init" pour configurer les permissions
 init:
@@ -38,6 +38,22 @@ install:
 	@echo "Installation de blackbox dans /usr/local/bin (peut necessiter les droits administrateur/sudo)..."
 	@ln -sf $(CURDIR)/blackbox /usr/local/bin/blackbox
 	@printf "\033[1;32m[✓] Installation terminee ! Vous pouvez maintenant utiliser la commande 'blackbox' depuis n'importe quel dossier.\033[0m\n"
+
+env_setup:
+	@if [ ! -f .env ]; then \
+		printf "\n\033[1;33m  Configuration de l'alerte Telegram (Optionnel)\033[0m\n"; \
+		read -p "Entrez votre TELEGRAM_BOT_TOKEN (Entree pour ignorer) : " token; \
+		read -p "Entrez votre TELEGRAM_CHAT_ID (Entree pour ignorer) : " chatid; \
+		if [ -n "$$token" ] && [ -n "$$chatid" ]; then \
+			echo "TELEGRAM_BOT_TOKEN=\"$$token\"" > .env; \
+			echo "TELEGRAM_CHAT_ID=\"$$chatid\"" >> .env; \
+			printf "\033[1;32m[✓] Fichier .env cree avec succes !\033[0m\n"; \
+		else \
+			printf "\033[1;30m[i] Configuration Telegram ignoree. Vous pourrez creer le .env manuellement plus tard.\033[0m\n"; \
+		fi \
+	else \
+		printf "\033[1;32m[✓] Fichier .env deja existant. (Configuration Telegram conservee)\033[0m\n"; \
+	fi
 
 uninstall:
 	@echo "Desinstallation de blackbox (peut necessiter les droits administrateur/sudo)..."
