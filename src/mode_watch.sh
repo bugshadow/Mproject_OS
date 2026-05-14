@@ -140,22 +140,35 @@ __send_telegram_alert() {
 # ------------------------------------------------------------
 # Envoi d'une alerte SMS via l'API Twilio (Bonus)
 # ------------------------------------------------------------
-# __send_twilio_sms_alert() {
-#     local cmd_intercepted="$1"
+__send_twilio_sms_alert() {
+    local cmd_intercepted="$1"
     
-#     if [ -f "./.env" ]; then source "./.env"; fi
-#     if [ -z "$TWILIO_ACCOUNT_SID" ] || [ -z "$TWILIO_AUTH_TOKEN" ]; then return; fi
+    # --- Chargement sécurisé depuis le fichier .env (Chemin absolu) ---
+    local env_file="/home/${SUDO_USER:-$USER}/Mproject_OS/.env"
+    if [ ! -f "$env_file" ]; then
+        # Fallback au cas ou le dossier serait différent
+        env_file="${BLACKBOX_PROJECT_ROOT:-.}/.env"
+    fi
     
-#     if command -v curl >/dev/null 2>&1; then
-#         # SMS court (limite à 160 char)
-#         curl -s -X POST "https://api.twilio.com/2010-04-01/Accounts/$TWILIO_ACCOUNT_SID/Messages.json" \
-#             --data-urlencode "Body=🚨 URGENCE BLACKBOX: Commande dangereuse ($cmd_intercepted) exécutée par $USER sur $(hostname)." \
-#             --data-urlencode "From=$TWILIO_FROM_NUMBER" \
-#             --data-urlencode "To=$TWILIO_TO_NUMBER" \
-#             -u "$TWILIO_ACCOUNT_SID:$TWILIO_AUTH_TOKEN" \
-#             -o /dev/null &
-#     fi
-# }
+    if [ -f "$env_file" ]; then
+        source "$env_file"
+    else
+        return
+    fi
+
+    if [ -z "$TWILIO_ACCOUNT_SID" ] || [ -z "$TWILIO_AUTH_TOKEN" ] || [ -z "$TWILIO_TO_NUMBER" ]; then return; fi
+    
+    if command -v curl >/dev/null 2>&1; then
+        # SMS court (limite à 160 char)
+        curl -s -X POST "https://api.twilio.com/2010-04-01/Accounts/$TWILIO_ACCOUNT_SID/Messages.json" \
+            --data-urlencode "Body=🚨 URGENCE BLACKBOX: Cmd dangereuse ($cmd_intercepted) exécutée par $USER." \
+            --data-urlencode "From=$TWILIO_FROM_NUMBER" \
+            --data-urlencode "To=$TWILIO_TO_NUMBER" \
+            -u "$TWILIO_ACCOUNT_SID:$TWILIO_AUTH_TOKEN" \
+            -o /dev/null &
+        disown
+    fi
+}
 
 __blackbox_danger_check() {
     local cmd="$1"
@@ -166,6 +179,11 @@ __blackbox_danger_check() {
             
             # ---> Déclenchement de l'alerte Telegram (si -A activé) <---
             __send_telegram_alert "$cmd"
+            
+            # ---> Déclenchement de l'alerte SMS Twilio (si -A activé) <---
+            if [ "$FLAG_ALERT" == "true" ]; then
+                __send_twilio_sms_alert "$cmd"
+            fi
             
             return
         fi
