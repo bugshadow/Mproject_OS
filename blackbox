@@ -92,7 +92,7 @@ init_environment() {
         # Pour le mode multi-utilisateur, le dossier doit être accessible en ecriture
         chmod 777 "$LOG_DIR" 2>/dev/null
     fi
-
+    
     # Fichier de log specifique
     export LOG_FILE="${LOG_DIR}/history.log"
     # S'assurer que le fichier est accessible en ecriture pour tous les utilisateurs surveilles
@@ -129,9 +129,9 @@ validate() {
         
         # Test silencieux pour verifier si on a les droits d'ecriture dans le dossier de destination
         if [ ! -w "$LOG_FILE" ] || [ ! -d "$LOG_DIR" ]; then
-             die 103 "Permission refusee. Vous n'avez pas le droit d'ecrire dans /var/log/blackbox.\n┃ Solution: Utilisez 'sudo' ou utilisez un dossier local avec l'option '-l ./var_local/log'"
+            die 103 "Permission refusee. Vous n'avez pas le droit d'ecrire dans /var/log/blackbox.\n┃ Solution: Utilisez 'sudo' ou utilisez un dossier local avec l'option '-l ./var_local/log'"
         fi
-
+        
         # Verification du repertoire source (Obligatoire pour Analyze, Optionnel pour Watch)
         if [ ! -d "$log_path" ] && [ ! -d "/var/log/$SERVICE_NAME" ]; then
             if [ "$MODE" = "analyze" ]; then
@@ -141,13 +141,13 @@ validate() {
             fi
         fi
     fi
-
+    
     if [ "$MODE" = "playback" ]; then
         [ ! -f "$LOG_FILE" ] && die 104 "Fichier history.log introuvable pour rejeu (mode -p)"
     fi
 }
 
-mode_restore() { 
+mode_restore() {
     [ "$(id -u)" != "0" ] && die 103 "Tentative d'action critique (restore) sans les droits administrateur (root). Utilisez sudo !"
     rm -rf "$LOG_DIR"
     log_event "INFOS" "Environnement reinitialise avec succes"
@@ -174,10 +174,10 @@ main() {
         display_help
         exit 0
     fi
-
+    
     init_environment
     validate
-
+    
     # Dev 3: Verification du helper C multithread (Option -t)
     if $FLAG_THREAD; then
         export COMPRESS_HELPER="./bin/compress_helper"
@@ -187,7 +187,7 @@ main() {
             log_event "WARN" "Option -t activee mais bin/compress_helper introuvable. Lancez 'make' pour compiler."
         fi
     fi
-
+    
     if $FLAG_SUBSHELL; then
         log_event "INFOS" "Mode isole active (Subshell)."
         echo -e "${C_CYAN}PID parent: $$${C_RESET}"
