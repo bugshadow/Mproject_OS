@@ -4,7 +4,7 @@ SRC_DIR = src
 BIN_DIR = bin
 
 # La règle par défaut DOIT être la première du fichier
-all: init clean create_dirs build success
+all: init clean create_dirs build install success
 
 # Ajout d'une règle "init" pour configurer les permissions
 init:
@@ -14,8 +14,8 @@ init:
 	@echo "Permissions d'execution et de lecture (755) accordees avec succes !"
 
 success:
-	@printf "\n\033[1;32m[✓] Configuration terminee avec succes !\033[0m\n"
-	@printf "\033[1;34m[Etape Suivante]\033[0m Vous pouvez maintenant lancer : \033[1;33m./blackbox -h\033[0m\n\n"
+	@printf "\n\033[1;32m[✓] Configuration et Installation terminees avec succes !\033[0m\n"
+	@printf "\033[1;34m[Etape Suivante]\033[0m Vous pouvez maintenant taper directement : \033[1;33mblackbox -h\033[0m depuis n'importe quel dossier\n\n"
 
 create_dirs:
 	@echo "Creation des dossiers necessaires..."
