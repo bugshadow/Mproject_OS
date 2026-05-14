@@ -41,18 +41,35 @@ install:
 
 env_setup:
 	@if [ ! -f .env ]; then \
-		printf "\n\033[1;33m  Configuration de l'alerte Telegram (Optionnel)\033[0m\n"; \
+		touch .env; \
+		printf "\n\033[1;33m⚙️  Configuration de l'alerte Telegram (Optionnel)\033[0m\n"; \
 		read -p "Entrez votre TELEGRAM_BOT_TOKEN (Entree pour ignorer) : " token; \
 		read -p "Entrez votre TELEGRAM_CHAT_ID (Entree pour ignorer) : " chatid; \
 		if [ -n "$$token" ] && [ -n "$$chatid" ]; then \
-			echo "TELEGRAM_BOT_TOKEN=\"$$token\"" > .env; \
+			echo "TELEGRAM_BOT_TOKEN=\"$$token\"" >> .env; \
 			echo "TELEGRAM_CHAT_ID=\"$$chatid\"" >> .env; \
-			printf "\033[1;32m[✓] Fichier .env cree avec succes !\033[0m\n"; \
+			printf "\033[1;32m[✓] Configuration Telegram ajoutee au fichier .env !\033[0m\n"; \
 		else \
-			printf "\033[1;30m[i] Configuration Telegram ignoree. Vous pourrez creer le .env manuellement plus tard.\033[0m\n"; \
-		fi \
+			printf "\033[1;30m[i] Configuration Telegram ignoree.\033[0m\n"; \
+		fi; \
+		printf "\n\033[1;33m📱 Configuration de l'alerte SMS Twilio (Optionnel)\033[0m\n"; \
+		read -p "Voulez-vous configurer les alertes SMS ? (O/n) : " ans; \
+		if [ "$$ans" = "O" ] || [ "$$ans" = "o" ] || [ "$$ans" = "y" ] || [ "$$ans" = "Y" ] || [ -z "$$ans" ]; then \
+			read -p "   - TWILIO_ACCOUNT_SID : " tsid; \
+			read -p "   - TWILIO_AUTH_TOKEN : " ttoken; \
+			read -p "   - TWILIO_FROM_NUMBER (Expediteur ex: +1234..) : " tfrom; \
+			read -p "   - TWILIO_TO_NUMBER (Destinataire ex: +1234..) : " tto; \
+			echo "TWILIO_ACCOUNT_SID=\"$$tsid\"" >> .env; \
+			echo "TWILIO_AUTH_TOKEN=\"$$ttoken\"" >> .env; \
+			echo "TWILIO_FROM_NUMBER=\"$$tfrom\"" >> .env; \
+			echo "TWILIO_TO_NUMBER=\"$$tto\"" >> .env; \
+			printf "\033[1;32m[✓] Configuration SMS Twilio ajoutee au fichier .env !\033[0m\n"; \
+		else \
+			printf "\033[1;30m[i] Configuration SMS ignoree.\033[0m\n"; \
+		fi; \
+		printf "\033[1;32m[✓] Processus de configuration du fichier .env termine !\033[0m\n"; \
 	else \
-		printf "\033[1;32m[✓] Fichier .env deja existant. (Configuration Telegram conservee)\033[0m\n"; \
+		printf "\033[1;32m[✓] Fichier .env deja existant. (Configurations conservees)\033[0m\n"; \
 	fi
 
 uninstall:
